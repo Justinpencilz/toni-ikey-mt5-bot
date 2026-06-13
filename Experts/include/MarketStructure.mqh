@@ -504,17 +504,18 @@ bool DetectMSS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
 }
 
 //+------------------------------------------------------------------+
-//| 5. BREAK OF STRUCTURE (BOS) — CONTINUATION CONCEPT (Definition 2)|
+//| 5. BREAK OF STRUCTURE (BOS) — FULL BODY CANDLE BREAK            |
 //|                                                                   |
-//| BOS = Any candle whose FULL BODY (close) breaks a swing level.    |
-//|       Not just a wick touch — the candle must CLOSE beyond it.    |
+//| Bullish BOS: candle closes ABOVE a swing high (full body break)  |
+//| Bearish BOS: candle closes BELOW a swing low (full body break)   |
 //|                                                                   |
-//| Uptrend BOS:  candle close > previous swing high                  |
-//| Downtrend BOS: candle close < previous swing low                  |
+//| WEEP (not BOS): wick touches/beyond level but body doesn't close |
 //|                                                                   |
-//| CRITICAL RULE — Single vs Multiple BOS:                          |
-//|   Single BOS (only 1 level body-broken)  → IGNORE                |
-//|   Multiple/Double BOS (2+ levels body-broken) → valid for trading |
+//| Does NOT check bars — checks each swing point against current    |
+//| close. If close has moved beyond the swing level = BOS.          |
+//|                                                                   |
+//| Single BOS (1 level broken) → IGNORE                             |
+//| Multiple BOS (2+ levels broken) → VALID                          |
 //+------------------------------------------------------------------+
 
 bool DetectBOS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
@@ -522,91 +523,53 @@ bool DetectBOS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
    g_ms.hasBOS = false;
    g_ms.bosBreaksCount = 0;
    
-   int bars = Bars(symbol, tf);
-   int checkBars = MathMin(barsBack, bars - 2);
-   if(checkBars < 10) return false;
-   
-   // Re-run swing detection and trend identification
-   DetectSwingPoints(symbol, tf, checkBars);
-   DetermineTrend(symbol, tf);
-   
-   // BOS requires a trending market
-   if(g_ms.trend != TREND_UPTREND && g_ms.trend != TREND_DOWNTREND)
-      return false;
+   // Get current close
+   double currentClose = iClose(symbol, tf, 1);
+   double currentHigh  = iHigh(symbol, tf, 1);
+   double currentLow   = iLow(symbol, tf, 1);
    
    int hCount = ArraySize(g_swingHighs);
    int lCount = ArraySize(g_swingLows);
    
-   // ---- BOS in UPTREND ----
-   // Any candle whose FULL BODY breaks previous swing highs
-   if(g_ms.trend == TREND_UPTREND)
+   int bullishBreaks = 0;  // Close above swing high
+   int bearishBreaks = 0;  // Close below swing low
+   
+   // Check each swing high: has close moved above it?
+   for(int i = 0; i < hCount; i++)
    {
-      if(hCount < 2) return false;
+      double swingPrice = g_swingHighs[i].price;
       
-      int breaks = 0;
-      
-      // Walk back through recent candles — any one that closed above a swing high = BOS
-      for(int b = 1; b <= MathMin(5, checkBars); b++)
+      if(currentClose > swingPrice)
       {
-         double barClose = iClose(symbol, tf, b);
-         int barBreaks = 0;
-         
-         for(int i = 0; i < hCount; i++)
-         {
-            // Full body break: close must be ABOVE the swing high
-            if(barClose > g_swingHighs[i].price)
-               barBreaks++;
-         }
-         
-         if(barBreaks > breaks)
-            breaks = barBreaks;
-      }
-      
-      g_ms.bosBreaksCount = breaks;
-      
-      if(breaks >= 1)
-      {
-         g_ms.hasBOS = true;
-         g_ms.bosIsBullish = true;
-         return true;
+         // Full body BOS — close above the swing high
+         bullishBreaks++;
       }
    }
    
-   // ---- BOS in DOWNTREND ----
-   // Any candle whose FULL BODY breaks previous swing lows
-   if(g_ms.trend == TREND_DOWNTREND)
+   // Check each swing low: has close moved below it?
+   for(int i = 0; i < lCount; i++)
    {
-      if(lCount < 2) return false;
+      double swingPrice = g_swingLows[i].price;
       
-      int breaks = 0;
-      
-      for(int b = 1; b <= MathMin(5, checkBars); b++)
+      if(currentClose < swingPrice)
       {
-         double barClose = iClose(symbol, tf, b);
-         int barBreaks = 0;
-         
-         for(int i = 0; i < lCount; i++)
-         {
-            // Full body break: close must be BELOW the swing low
-            if(barClose < g_swingLows[i].price)
-               barBreaks++;
-         }
-         
-         if(barBreaks > breaks)
-            breaks = barBreaks;
+         // Full body BOS — close below the swing low
+         bearishBreaks++;
       }
-      
-      g_ms.bosBreaksCount = breaks;
-      
-      if(breaks >= 1)
-      {
-         g_ms.hasBOS = true;
-         g_ms.bosIsBullish = false;
-         return true;
-      }
+   }
+   
+   // Determine direction
+   g_ms.bosIsBullish = (bullishBreaks >= bearishBreaks);
+   g_ms.bosBreaksCount = MathMax(bullishBreaks, bearishBreaks);
+   
+   if(g_ms.bosBreaksCount >= 1)
+   {
+      g_ms.hasBOS = true;
+      return true;
    }
    
    return false;
+}
 }
 
 //+------------------------------------------------------------------+
@@ -677,14 +640,8 @@ void UpdateMarketStructure(string symbol, ENUM_TIMEFRAMES tf, int lookbackBars)
    // 3. Build trendlines
    BuildTrendlines(symbol, tf);
    
-   // 4. Detect MSS (reversal)
-   DetectMSS(symbol, tf, lookbackBars);
-   
-   // 5. Detect BOS (continuation) - for both trending and ranging
-   if(g_ms.trend == TREND_RANGING)
-      DetectRangeBreakout(symbol, tf, lookbackBars);
-   else
-      DetectBOS(symbol, tf, lookbackBars);
+   // 4. Detect BOS (continuation) - check each swing against current close
+   DetectBOS(symbol, tf, lookbackBars);
 }
 
 //+------------------------------------------------------------------+

@@ -148,13 +148,87 @@ void CleanupObjects(string prefix, int maxKeep)
 }
 
 //+------------------------------------------------------------------+
-//| MAIN — draw only swing points + sequence labels                 |
+//| MAIN — draw swing points + sequence labels + BOS                |
 //+------------------------------------------------------------------+
 
 void DrawAllStructures(string biasStr)
 {
    DrawSwingPoints();
    DrawSwingSequence();
+   DrawBOS();
+}
+
+//+------------------------------------------------------------------+
+//| BOS — dotted lines at body-broken swing levels only              |
+//+------------------------------------------------------------------+
+
+void DrawBOS()
+{
+   if(g_ms.hasBOS)
+   {
+      bool isBullish = g_ms.bosIsBullish;
+      int breaks = g_ms.bosBreaksCount;
+      color bosColor = isBullish ? clrCyan : clrMagenta;
+      
+      // Draw dotted lines at body-broken swing highs
+      if(isBullish && ArraySize(g_swingHighs) > 0)
+      {
+         int drawCount = MathMin(breaks, ArraySize(g_swingHighs));
+         for(int i = 0; i < drawCount; i++)
+         {
+            string id = "BOS_H_" + IntegerToString(i);
+            string objName = gd_prefix + id;
+            double level = g_swingHighs[i].price;
+            
+            if(ObjectFind(gd_chartId, objName) < 0)
+               ObjectCreate(gd_chartId, objName, OBJ_HLINE, 0, 0, level);
+            ObjectSetDouble(gd_chartId, objName, OBJPROP_PRICE, level);
+            ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, bosColor);
+            ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
+            ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, false);
+         }
+         // Cleanup excess
+         int maxToKeep = breaks + 2;
+         for(int i = maxToKeep; i < 100; i++)
+            if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_H_" + IntegerToString(i)))
+               break;
+      }
+      
+      // Draw dotted lines at body-broken swing lows
+      if(!isBullish && ArraySize(g_swingLows) > 0)
+      {
+         int drawCount = MathMin(breaks, ArraySize(g_swingLows));
+         for(int i = 0; i < drawCount; i++)
+         {
+            string id = "BOS_L_" + IntegerToString(i);
+            string objName = gd_prefix + id;
+            double level = g_swingLows[i].price;
+            
+            if(ObjectFind(gd_chartId, objName) < 0)
+               ObjectCreate(gd_chartId, objName, OBJ_HLINE, 0, 0, level);
+            ObjectSetDouble(gd_chartId, objName, OBJPROP_PRICE, level);
+            ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, bosColor);
+            ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
+            ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, false);
+         }
+         int maxToKeep = breaks + 2;
+         for(int i = maxToKeep; i < 100; i++)
+            if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_L_" + IntegerToString(i)))
+               break;
+      }
+   }
+   else
+   {
+      // Clean all BOS objects
+      for(int i = 0; i < 100; i++)
+      {
+         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_H_" + IntegerToString(i)))
+         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_L_" + IntegerToString(i)))
+            break;
+      }
+   }
 }
 
 //+------------------------------------------------------------------+
