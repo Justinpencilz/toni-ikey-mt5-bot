@@ -75,6 +75,9 @@ int OnCalculate(const int rates_total,
    DetectSwingPoints(_Symbol, InpTFTrend, InpSwingLookback);
    DetermineTrend(_Symbol, InpTFTrend);
    
+   // Detect BOS: check each swing against current close
+   DetectBOS(_Symbol, InpTFTrend, InpSwingLookback);
+   
    // Draw swings + labels + BOS
    DrawAllStructures("");
    
