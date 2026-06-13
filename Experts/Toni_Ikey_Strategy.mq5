@@ -1,15 +1,16 @@
 //+------------------------------------------------------------------+
 //|                                          Toni_Ikey_Strategy.mq5  |
-//|           Stage 1: Market Structure Detection                    |
+//|           Stage 1: Market Structure Detection + Visual Mapping   |
 //|     Strictly based on Toni Iyke Advanced Class definitions       |
 //+------------------------------------------------------------------+
 #property copyright "Justinpencilz"
 #property link      "https://github.com/Justinpencilz"
-#property version   "1.00"
+#property version   "1.10"
 
 #include <Trade/Trade.mqh>
 #include "include/Strategy.mqh"
 #include "include/MarketStructure.mqh"
+#include "include/ChartDrawing.mqh"
 
 //+------------------------------------------------------------------+
 //| INPUT PARAMETERS                                                 |
@@ -29,11 +30,20 @@ input int    InpMSSLookback          = 20;           // Bars to scan for MSS
 // --- BOS Detection ---
 input int    InpBOSLookback          = 30;           // Bars to scan for BOS
 
-// --- Display ---
-input bool   InpShowLabels           = true;         // Show structure info on chart
-input color  InpLabelColor           = clrWhite;     // Label color
-input int    InpLabelX               = 10;           // Label X offset
-input int    InpLabelY               = 30;           // Label Y offset
+// --- Display: Chart Objects ---
+input bool   InpDrawSwingPoints      = true;         // Draw ▲ ▼ at swing points
+input bool   InpDrawTrendline        = true;         // Draw trendlines (uptrend/downtrend)
+input bool   InpDrawMSS              = true;         // Draw horizontal line at MSS level
+input bool   InpDrawBOS              = true;         // Draw horizontal lines at BOS zones
+input bool   InpDrawSequence         = true;         // Label HH/HL/LH/LL on swings
+input bool   InpDrawZones            = true;         // Label INTERNAL vs EXTERNAL zones
+input bool   InpDrawBias             = true;         // Show directional bias on chart
+
+// --- Display: Text Labels ---
+input bool   InpShowInfoPanel        = true;         // Show info panel (top-left)
+input color  InpPanelColor           = clrWhite;     // Panel text color
+input int    InpPanelX               = 10;           // Panel X offset
+input int    InpPanelY               = 30;           // Panel Y offset
 
 //+------------------------------------------------------------------+
 //| GLOBALS                                                          |
@@ -41,10 +51,8 @@ input int    InpLabelY               = 30;           // Label Y offset
 
 CTrade          g_trade;
 long            g_chartId;
-int             g_labelPrefix;
-string          g_prefix;
 datetime        g_lastUpdate;
-int             g_updateInterval = 5;  // Update every N ticks
+int             g_updateInterval = 5;  // Update every N seconds
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -53,7 +61,6 @@ int             g_updateInterval = 5;  // Update every N ticks
 int OnInit()
 {
    g_chartId = ChartID();
-   g_prefix = "TONI_IKEY_";
    
    // Validate swing lookback parameter
    if(InpSwingBars < 1 || InpSwingBars > 10)
@@ -66,7 +73,10 @@ int OnInit()
    InitMarketStructure();
    g_lastUpdate = 0;
    
-   Print("Toni Ikey Strategy EA Stage 1 loaded.");
+   // Initialize chart drawing
+   DrawInit(g_chartId, _Symbol, "TI_");
+   
+   Print("Toni Ikey Strategy EA v1.10 — Stage 1 loaded.");
    Print("Scanning: " + _Symbol + " on TF " + EnumToString(InpTFTrend));
    Print("Bias TF: " + EnumToString(InpTFBias));
    
@@ -79,8 +89,9 @@ int OnInit()
 
 void OnDeinit(const int reason)
 {
-   // Clean up chart labels
-   ObjectsDeleteAll(g_chartId, g_prefix);
+   // Clean up all drawn objects and labels
+   DrawEraseAll();
+   ObjectsDeleteAll(g_chartId, "TI_LBL_");
    Comment("");
 }
 
@@ -102,26 +113,35 @@ void OnTick()
    // --- STEP 2: Get directional bias from HTF (Definition 3) ---
    string biasStr = GetDirectionalBias(_Symbol, InpTFBias);
    
-   // --- STEP 3: Display results ---
-   if(InpShowLabels)
+   // --- STEP 3: Draw structures on chart ---
+   if(InpDrawSwingPoints || InpDrawTrendline || InpDrawMSS || 
+      InpDrawBOS || InpDrawSequence || InpDrawZones || InpDrawBias)
    {
-      DisplayStructureInfo(biasStr);
+      DrawAllStructures(biasStr);
    }
    
-   // --- STEP 4: Log signal if one is active ---
+   // --- STEP 4: Display info panel ---
+   if(InpShowInfoPanel)
+   {
+      DisplayInfoPanel(biasStr);
+   }
+   
+   // --- STEP 5: Log signal if one is active ---
    LogCurrentState(biasStr);
 }
 
 //+------------------------------------------------------------------+
 //| Get Directional Bias from Higher Timeframe (Definition 3)        |
-//| HTF in uptrend → overall bullish → look for buys                 |
-//| HTF in downtrend → overall bearish → look for sells              |
 //+------------------------------------------------------------------+
 
 string GetDirectionalBias(string symbol, ENUM_TIMEFRAMES htf)
 {
    // Save and restore the main structure
    MarketStructure savedMS = g_ms;
+   SwingPoint savedHighs[];
+   SwingPoint savedLows[];
+   ArrayCopy(savedHighs, g_swingHighs);
+   ArrayCopy(savedLows, g_swingLows);
    
    // Analyze HTF trend
    DetectSwingPoints(symbol, htf, InpSwingLookback);
@@ -146,15 +166,17 @@ string GetDirectionalBias(string symbol, ENUM_TIMEFRAMES htf)
    
    // Restore the main structure
    g_ms = savedMS;
+   ArrayCopy(g_swingHighs, savedHighs);
+   ArrayCopy(g_swingLows, savedLows);
    
    return biasStr;
 }
 
 //+------------------------------------------------------------------+
-//| Display structure information on chart                           |
+//| Display info panel on chart (top-left)                           |
 //+------------------------------------------------------------------+
 
-void DisplayStructureInfo(string biasStr)
+void DisplayInfoPanel(string biasStr)
 {
    string trendSymbol = "";
    color trendColor = clrWhite;
@@ -178,12 +200,12 @@ void DisplayStructureInfo(string biasStr)
          trendColor = clrGray;
    }
    
-   int y = InpLabelY;
-   int x = InpLabelX;
+   int y = InpPanelY;
+   int x = InpPanelX;
    int fontSize = 10;
    
    // Line 1: Symbol + Trend
-   CreateLabel("TREND", x, y, _Symbol + " | " + trendSymbol, trendColor, fontSize);
+   PanelLabel("TREND", x, y, _Symbol + " | " + trendSymbol, trendColor, fontSize);
    y += 18;
    
    // Line 2: Trend sequence details
@@ -200,101 +222,102 @@ void DisplayStructureInfo(string biasStr)
       seq += "  Last Swing H: " + DoubleToString(g_ms.lastSwingHigh.price, _Digits);
       seq += "  L: " + DoubleToString(g_ms.lastSwingLow.price, _Digits);
    }
+   else if(g_ms.trend == TREND_RANGING)
+   {
+      seq = "Range bound — no HH/HL or LH/LL";
+   }
    else
    {
-      seq = "No clear HH/HL or LH/LL sequence";
+      seq = "Insufficient data for trend";
    }
-   CreateLabel("SEQ", x, y, seq, clrWhite, fontSize);
+   PanelLabel("SEQ", x, y, seq, clrWhite, fontSize);
    y += 18;
    
    // Line 3: Directional Bias
-   string biasColorStr = "";
    if(StringFind(biasStr, "BUYS") >= 0)
-      CreateLabel("BIAS", x, y, "Bias: " + biasStr, clrLimeGreen, fontSize);
+      PanelLabel("BIAS", x, y, "Bias: " + biasStr, clrLimeGreen, fontSize);
    else if(StringFind(biasStr, "SELLS") >= 0)
-      CreateLabel("BIAS", x, y, "Bias: " + biasStr, clrRed, fontSize);
+      PanelLabel("BIAS", x, y, "Bias: " + biasStr, clrRed, fontSize);
    else
-      CreateLabel("BIAS", x, y, "Bias: " + biasStr, clrYellow, fontSize);
+      PanelLabel("BIAS", x, y, "Bias: " + biasStr, clrYellow, fontSize);
    y += 18;
    
    // Line 4: MSS Status
    if(g_ms.hasMSS)
    {
-      string mssStr = "⚡ MSS DETECTED: ";
+      string mssStr = "⚡ MSS: ";
       mssStr += (g_ms.mssIsBullish ? "BUY REVERSAL" : "SELL REVERSAL");
-      mssStr += "  (Level: " + DoubleToString(g_ms.mssBrokenLevel, _Digits) + ")";
-      CreateLabel("MSS", x, y, mssStr, clrOrange, fontSize + 2);
-      y += 18;
+      mssStr += " at " + DoubleToString(g_ms.mssBrokenLevel, _Digits);
+      PanelLabel("MSS", x, y, mssStr, clrOrange, fontSize + 1);
    }
    else
    {
-      CreateLabel("MSS", x, y, "No MSS detected", clrGray, fontSize);
-      y += 18;
+      PanelLabel("MSS", x, y, "MSS: none", clrGray, fontSize);
    }
+   y += 18;
    
    // Line 5: BOS Status
    if(g_ms.hasBOS)
    {
-      string bosStr = "⇨ BOS: " + IntegerToString(g_ms.bosBreaksCount) + " zone(s) broken";
-      bosStr += " (" + (g_ms.bosIsBullish ? "BULLISH" : "BEARISH") + ")";
+      string bosStr = "⇨ BOS: " + IntegerToString(g_ms.bosBreaksCount) + " zone(s)";
+      bosStr += (g_ms.bosIsBullish ? " ↑" : " ↓");
       
       if(g_ms.bosBreaksCount >= BOS_MIN_MULTIPLE)
       {
-         bosStr += " → VALID for continuation trades";
-         CreateLabel("BOS", x, y, bosStr, clrCyan, fontSize + 2);
+         bosStr += "  VALID ✓";
+         PanelLabel("BOS", x, y, bosStr, clrCyan, fontSize + 1);
       }
       else
       {
-         bosStr += " → IGNORE (single BOS)";
-         CreateLabel("BOS", x, y, bosStr, clrGray, fontSize);
+         bosStr += "  IGNORE (single)";
+         PanelLabel("BOS", x, y, bosStr, clrDarkGray, fontSize);
       }
-      y += 18;
    }
    else
    {
-      CreateLabel("BOS", x, y, "No BOS detected", clrGray, fontSize);
-      y += 18;
+      PanelLabel("BOS", x, y, "BOS: none", clrGray, fontSize);
    }
+   y += 18;
    
    // Line 6: Trendline info
    if(g_ms.uptrendLine.valid)
-      CreateLabel("TLU", x, y, "Uptrend line active (connecting higher lows)", clrLimeGreen, fontSize);
+      PanelLabel("TL", x, y, "Trendline: Uptrend (higher lows connected)", clrLimeGreen, fontSize);
    else if(g_ms.downtrendLine.valid)
-      CreateLabel("TLD", x, y, "Downtrend line active (connecting lower highs)", clrRed, fontSize);
+      PanelLabel("TL", x, y, "Trendline: Downtrend (lower highs connected)", clrRed, fontSize);
    else if(g_ms.rangeResistance.valid)
-      CreateLabel("TLR", x, y, "Range: Resistance=" + DoubleToString(g_ms.rangeResistance.point2Price, _Digits) 
-         + " Support=" + DoubleToString(g_ms.rangeSupport.point2Price, _Digits), clrYellow, fontSize);
+      PanelLabel("TL", x, y, "Range: " + DoubleToString(g_ms.rangeSupport.point2Price, _Digits) 
+         + " — " + DoubleToString(g_ms.rangeResistance.point2Price, _Digits), clrYellow, fontSize);
+   else
+      PanelLabel("TL", x, y, "Trendline: none", clrGray, fontSize);
    y += 18;
    
-   // Line 7: Summary / Trading implication
+   // Line 7: Trading implication
    string summary = "→ ";
    if(g_ms.trend == TREND_RANGING)
-      summary += "Range market. Wait for breakout for continuation entries.";
+      summary += "Wait for breakout for continuation entries.";
    else if(StringFind(biasStr, "BUYS") >= 0 && g_ms.trend == TREND_DOWNTREND)
-      summary += "HTF bullish, LTF selling. Watch for MSS at HTF POI for reversal.";
+      summary += "HTF bullish, LTF selling. Watch for MSS at HTF POI.";
    else if(StringFind(biasStr, "SELLS") >= 0 && g_ms.trend == TREND_UPTREND)
-      summary += "HTF bearish, LTF buying. Watch for MSS at HTF POI for reversal.";
+      summary += "HTF bearish, LTF buying. Watch for MSS at HTF POI.";
    else if(g_ms.trend == TREND_UPTREND)
       summary += "Uptrend. Look for multiple BOS for continuation buys.";
    else if(g_ms.trend == TREND_DOWNTREND)
       summary += "Downtrend. Look for multiple BOS for continuation sells.";
    else
       summary += "No clear setup.";
-   CreateLabel("SUMMARY", x, y, summary, clrDarkGray, fontSize - 2);
+   PanelLabel("SUMMARY", x, y, summary, clrLightGray, fontSize - 2);
 }
 
 //+------------------------------------------------------------------+
-//| Helper: Create a chart label                                     |
+//| Helper: Create or update info panel label                        |
 //+------------------------------------------------------------------+
 
-void CreateLabel(string name, int x, int y, string text, color clr, int fontSize)
+void PanelLabel(string name, int x, int y, string text, color clr, int fontSize)
 {
-   string objName = g_prefix + name;
+   string objName = "TI_LBL_" + name;
    
    if(ObjectFind(g_chartId, objName) < 0)
-   {
       ObjectCreate(g_chartId, objName, OBJ_LABEL, 0, 0, 0);
-   }
    
    ObjectSetInteger(g_chartId, objName, OBJPROP_XDISTANCE, x);
    ObjectSetInteger(g_chartId, objName, OBJPROP_YDISTANCE, y);
