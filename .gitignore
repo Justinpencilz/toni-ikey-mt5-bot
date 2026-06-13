@@ -1,0 +1,46 @@
+# Compiled MT5 files
+Experts/*.ex5
+Experts/*.ex4
+Indicators/*.ex5
+Indicators/*.ex4
+Scripts/*.ex5
+Scripts/*.ex4
+
+# MQL5 cache
+*.obj
+*.lst
+*.map
+*.sym
+*.exp
+*.lib
+*.pdb
+*.ilk
+*.res
+*.tlog
+*.lastbuildstate
+*.log
+*.idb
+*.pch
+*.sdf
+*.suo
+*.user
+*.ncb
+*.aps
+*.opt
+*.plg
+*.bsc
+*.sbr
+*.ipch
+*.db
+*.opendb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
