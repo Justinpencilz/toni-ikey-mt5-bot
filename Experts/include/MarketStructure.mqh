@@ -633,7 +633,7 @@ bool DetectRangeBreakout(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
    double support    = g_swingLows[0].price;   // Bottom of range
    
    // Check if recent bars have broken out of the range (full body break)
-   for(int b = 1; b <= MathMin(5, checkBars); b++)
+   for(int b = 1; b <= MathMin(5, barsBack); b++)
    {
       double barHigh  = iHigh(symbol, tf, b);
       double barLow   = iLow(symbol, tf, b);
