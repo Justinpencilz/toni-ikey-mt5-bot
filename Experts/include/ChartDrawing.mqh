@@ -9,16 +9,15 @@
 #include "MarketStructure.mqh"
 
 //+------------------------------------------------------------------+
-//| INPUT GROUPS (passed from EA)                                    |
+//| GLOBALS                                                          |
 //+------------------------------------------------------------------+
 
-// --- These are set by the EA ---
-string   gd_prefix = "TI_";        // Object prefix
-long     gd_chartId = 0;           // Chart ID
-string   gd_symbol = "";           // Symbol
+string   gd_prefix = "TI_";
+long     gd_chartId = 0;
+string   gd_symbol = "";
 
 //+------------------------------------------------------------------+
-//| Initialize drawing session                                       |
+//| Init / Clear                                                     |
 //+------------------------------------------------------------------+
 
 void DrawInit(long chartId, string symbol, string prefix)
@@ -28,17 +27,13 @@ void DrawInit(long chartId, string symbol, string prefix)
    gd_prefix = prefix;
 }
 
-//+------------------------------------------------------------------+
-//| Erase all drawn objects                                           |
-//+------------------------------------------------------------------+
-
 void DrawEraseAll()
 {
    ObjectsDeleteAll(gd_chartId, gd_prefix);
 }
 
 //+------------------------------------------------------------------+
-//| Helper: create or update a chart object                          |
+//| Helper: create or update chart object                            |
 //+------------------------------------------------------------------+
 
 void DrawObject(string name, ENUM_OBJECT type, datetime time1, double price1, 
@@ -56,10 +51,7 @@ void DrawObject(string name, ENUM_OBJECT type, datetime time1, double price1,
 }
 
 //+------------------------------------------------------------------+
-//| 1. DRAW SWING POINTS                                             |
-//| Swing highs = ▼ down arrows (red/darkorange)                     |
-//| Swing lows  = ▲ up arrows   (green/lime)                         |
-//| With price labels                                                |
+//| 1. SWING POINTS — arrows only, NO price labels                   |
 //+------------------------------------------------------------------+
 
 void DrawSwingPoints()
@@ -67,79 +59,37 @@ void DrawSwingPoints()
    int hCount = ArraySize(g_swingHighs);
    int lCount = ArraySize(g_swingLows);
    
-   // --- Swing Highs ---
+   // Swing highs ▼
    for(int i = 0; i < hCount; i++)
    {
       string id = "SH_" + IntegerToString(i);
-      datetime t = g_swingHighs[i].time;
-      double p = g_swingHighs[i].price;
-      
-      // Arrow down ▼
-      DrawObject(id, OBJ_ARROW_DOWN, t, p);
+      DrawObject(id, OBJ_ARROW_DOWN, g_swingHighs[i].time, g_swingHighs[i].price);
       ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_COLOR, clrOrange);
       ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_WIDTH, 2);
       ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_ANCHOR, ANCHOR_TOP);
       ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_BACK, true);
-      
-      // Price label above
-      string labelId = "SHL_" + IntegerToString(i);
-      string labelName = gd_prefix + labelId;
-      if(ObjectFind(gd_chartId, labelName) < 0)
-         ObjectCreate(gd_chartId, labelName, OBJ_TEXT, 0, t, p);
-      ObjectSetString(gd_chartId, labelName, OBJPROP_TEXT, DoubleToString(p, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS)));
-      ObjectSetInteger(gd_chartId, labelName, OBJPROP_COLOR, clrOrange);
-      ObjectSetInteger(gd_chartId, labelName, OBJPROP_FONTSIZE, 8);
-      ObjectSetString(gd_chartId, labelName, OBJPROP_FONT, "Consolas");
-      ObjectSetInteger(gd_chartId, labelName, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
    }
-   
-   // Delete excess objects if swing count decreased
    CleanupObjects("SH_", hCount);
-   CleanupObjects("SHL_", hCount);
    
-   // --- Swing Lows ---
+   // Swing lows ▲
    for(int i = 0; i < lCount; i++)
    {
       string id = "SL_" + IntegerToString(i);
-      datetime t = g_swingLows[i].time;
-      double p = g_swingLows[i].price;
-      
-      // Arrow up ▲
-      DrawObject(id, OBJ_ARROW_UP, t, p);
+      DrawObject(id, OBJ_ARROW_UP, g_swingLows[i].time, g_swingLows[i].price);
       ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_COLOR, clrLimeGreen);
       ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_WIDTH, 2);
       ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
       ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_BACK, true);
-      
-      // Price label below
-      string labelId = "SLL_" + IntegerToString(i);
-      string labelName = gd_prefix + labelId;
-      if(ObjectFind(gd_chartId, labelName) < 0)
-         ObjectCreate(gd_chartId, labelName, OBJ_TEXT, 0, t, p);
-      ObjectSetString(gd_chartId, labelName, OBJPROP_TEXT, DoubleToString(p, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS)));
-      ObjectSetInteger(gd_chartId, labelName, OBJPROP_COLOR, clrLimeGreen);
-      ObjectSetInteger(gd_chartId, labelName, OBJPROP_FONTSIZE, 8);
-      ObjectSetString(gd_chartId, labelName, OBJPROP_FONT, "Consolas");
-      ObjectSetInteger(gd_chartId, labelName, OBJPROP_ANCHOR, ANCHOR_TOP);
    }
-   
    CleanupObjects("SL_", lCount);
-   CleanupObjects("SLL_", lCount);
 }
 
 //+------------------------------------------------------------------+
-//| 2. DRAW TRENDLINES (Definition 1)                                |
-//| Uptrend: solid green line connecting higher lows                 |
-//| Downtrend: solid red line connecting lower highs                 |
-//| Range: dashed yellow lines at support and resistance            |
+//| 2. TRENDLINES — slanted lines with direction label               |
 //+------------------------------------------------------------------+
 
 void DrawTrendlines()
 {
-   string id;
-   
-   // --- Uptrend Line ---
-   id = "TRENDLINE";
    if(g_ms.uptrendLine.valid && g_ms.uptrendLine.point2Time > 0)
    {
       datetime t1 = g_ms.uptrendLine.point1Time;
@@ -147,16 +97,14 @@ void DrawTrendlines()
       datetime t2 = g_ms.uptrendLine.point2Time;
       double   p2 = g_ms.uptrendLine.point2Price;
       
-      DrawObject(id, OBJ_TREND, t1, p1, t2, p2);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_COLOR, clrLimeGreen);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_WIDTH, 2);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_STYLE, STYLE_SOLID);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_RAY_RIGHT, true);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_BACK, true);
+      DrawObject("TRENDLINE", OBJ_TREND, t1, p1, t2, p2);
+      ObjectSetInteger(gd_chartId, gd_prefix + "TRENDLINE", OBJPROP_COLOR, clrLimeGreen);
+      ObjectSetInteger(gd_chartId, gd_prefix + "TRENDLINE", OBJPROP_WIDTH, 2);
+      ObjectSetInteger(gd_chartId, gd_prefix + "TRENDLINE", OBJPROP_RAY_RIGHT, true);
+      ObjectSetInteger(gd_chartId, gd_prefix + "TRENDLINE", OBJPROP_BACK, true);
       
-      // Label: "UPTREND"
-      string lblId = "TRENDLINE_LBL";
-      string lblName = gd_prefix + lblId;
+      // Label just "Uptrend" at the right end
+      string lblName = gd_prefix + "TRENDLINE_LBL";
       if(ObjectFind(gd_chartId, lblName) < 0)
          ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, t2, p2);
       ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "Uptrend");
@@ -172,15 +120,13 @@ void DrawTrendlines()
       datetime t2 = g_ms.downtrendLine.point2Time;
       double   p2 = g_ms.downtrendLine.point2Price;
       
-      DrawObject(id, OBJ_TREND, t1, p1, t2, p2);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_COLOR, clrRed);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_WIDTH, 2);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_STYLE, STYLE_SOLID);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_RAY_RIGHT, true);
-      ObjectSetInteger(gd_chartId, gd_prefix + id, OBJPROP_BACK, true);
+      DrawObject("TRENDLINE", OBJ_TREND, t1, p1, t2, p2);
+      ObjectSetInteger(gd_chartId, gd_prefix + "TRENDLINE", OBJPROP_COLOR, clrRed);
+      ObjectSetInteger(gd_chartId, gd_prefix + "TRENDLINE", OBJPROP_WIDTH, 2);
+      ObjectSetInteger(gd_chartId, gd_prefix + "TRENDLINE", OBJPROP_RAY_RIGHT, true);
+      ObjectSetInteger(gd_chartId, gd_prefix + "TRENDLINE", OBJPROP_BACK, true);
       
-      string lblId = "TRENDLINE_LBL";
-      string lblName = gd_prefix + lblId;
+      string lblName = gd_prefix + "TRENDLINE_LBL";
       if(ObjectFind(gd_chartId, lblName) < 0)
          ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, t2, p2);
       ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "Downtrend");
@@ -191,12 +137,9 @@ void DrawTrendlines()
    }
    else if(g_ms.rangeResistance.valid && g_ms.rangeSupport.valid)
    {
-      // Range: STRAIGHT HORIZONTAL lines at averaged levels
-      // Resistance line
-      string idRes = "RANGE_RESISTANCE";
-      string objRes = gd_prefix + idRes;
+      // Resistance horizontal line
       double resPrice = g_ms.rangeResistance.point1Price;
-      
+      string objRes = gd_prefix + "RANGE_RESISTANCE";
       if(ObjectFind(gd_chartId, objRes) < 0)
          ObjectCreate(gd_chartId, objRes, OBJ_HLINE, 0, 0, resPrice);
       ObjectSetDouble(gd_chartId, objRes, OBJPROP_PRICE, resPrice);
@@ -205,23 +148,19 @@ void DrawTrendlines()
       ObjectSetInteger(gd_chartId, objRes, OBJPROP_STYLE, STYLE_DASH);
       ObjectSetInteger(gd_chartId, objRes, OBJPROP_BACK, true);
       
-      // Label: "Resistance XXXXX"
-      string lblR = "RANGE_RESISTANCE_LBL";
-      string lblNameR = gd_prefix + lblR;
-      if(ObjectFind(gd_chartId, lblNameR) < 0)
-         ObjectCreate(gd_chartId, lblNameR, OBJ_TEXT, 0, g_ms.rangeResistance.point2Time, resPrice);
-      string resText = "Resistance " + DoubleToString(resPrice, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS));
-      ObjectSetString(gd_chartId, lblNameR, OBJPROP_TEXT, resText);
-      ObjectSetInteger(gd_chartId, lblNameR, OBJPROP_COLOR, clrYellow);
-      ObjectSetInteger(gd_chartId, lblNameR, OBJPROP_FONTSIZE, 9);
-      ObjectSetString(gd_chartId, lblNameR, OBJPROP_FONT, "Consolas");
-      ObjectSetInteger(gd_chartId, lblNameR, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
+      // Just "Resistance" label
+      string lblR = gd_prefix + "RANGE_RESISTANCE_LBL";
+      if(ObjectFind(gd_chartId, lblR) < 0)
+         ObjectCreate(gd_chartId, lblR, OBJ_TEXT, 0, g_ms.rangeResistance.point2Time, resPrice);
+      ObjectSetString(gd_chartId, lblR, OBJPROP_TEXT, "Resistance");
+      ObjectSetInteger(gd_chartId, lblR, OBJPROP_COLOR, clrYellow);
+      ObjectSetInteger(gd_chartId, lblR, OBJPROP_FONTSIZE, 9);
+      ObjectSetString(gd_chartId, lblR, OBJPROP_FONT, "Consolas");
+      ObjectSetInteger(gd_chartId, lblR, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
       
-      // Support line
-      string idSup = "RANGE_SUPPORT";
-      string objSup = gd_prefix + idSup;
+      // Support horizontal line
       double supPrice = g_ms.rangeSupport.point1Price;
-      
+      string objSup = gd_prefix + "RANGE_SUPPORT";
       if(ObjectFind(gd_chartId, objSup) < 0)
          ObjectCreate(gd_chartId, objSup, OBJ_HLINE, 0, 0, supPrice);
       ObjectSetDouble(gd_chartId, objSup, OBJPROP_PRICE, supPrice);
@@ -230,72 +169,54 @@ void DrawTrendlines()
       ObjectSetInteger(gd_chartId, objSup, OBJPROP_STYLE, STYLE_DASH);
       ObjectSetInteger(gd_chartId, objSup, OBJPROP_BACK, true);
       
-      // Label: "Support XXXXX"
-      string lblS = "RANGE_SUPPORT_LBL";
-      string lblNameS = gd_prefix + lblS;
-      if(ObjectFind(gd_chartId, lblNameS) < 0)
-         ObjectCreate(gd_chartId, lblNameS, OBJ_TEXT, 0, g_ms.rangeSupport.point2Time, supPrice);
-      string supText = "Support " + DoubleToString(supPrice, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS));
-      ObjectSetString(gd_chartId, lblNameS, OBJPROP_TEXT, supText);
-      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_COLOR, clrYellow);
-      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_FONTSIZE, 9);
-      ObjectSetString(gd_chartId, lblNameS, OBJPROP_FONT, "Consolas");
-      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_ANCHOR, ANCHOR_TOP);
+      string lblS = gd_prefix + "RANGE_SUPPORT_LBL";
+      if(ObjectFind(gd_chartId, lblS) < 0)
+         ObjectCreate(gd_chartId, lblS, OBJ_TEXT, 0, g_ms.rangeSupport.point2Time, supPrice);
+      ObjectSetString(gd_chartId, lblS, OBJPROP_TEXT, "Support");
+      ObjectSetInteger(gd_chartId, lblS, OBJPROP_COLOR, clrYellow);
+      ObjectSetInteger(gd_chartId, lblS, OBJPROP_FONTSIZE, 9);
+      ObjectSetString(gd_chartId, lblS, OBJPROP_FONT, "Consolas");
+      ObjectSetInteger(gd_chartId, lblS, OBJPROP_ANCHOR, ANCHOR_TOP);
    }
    else
    {
-      // No trendline valid — delete the objects
       ObjectDelete(gd_chartId, gd_prefix + "TRENDLINE");
       ObjectDelete(gd_chartId, gd_prefix + "TRENDLINE_LBL");
-      ObjectDelete(gd_chartId, gd_prefix + "RANGE_SUPPORT");
-      ObjectDelete(gd_chartId, gd_prefix + "RANGE_SUPPORT_LBL");
       ObjectDelete(gd_chartId, gd_prefix + "RANGE_RESISTANCE");
       ObjectDelete(gd_chartId, gd_prefix + "RANGE_RESISTANCE_LBL");
+      ObjectDelete(gd_chartId, gd_prefix + "RANGE_SUPPORT");
+      ObjectDelete(gd_chartId, gd_prefix + "RANGE_SUPPORT_LBL");
    }
 }
 
 //+------------------------------------------------------------------+
-//| 3. DRAW MSS MARKER (Reversal)                                    |
-//| Horizontal line at the broken swing level (CSS level)            |
-//| With "MSS BUY" or "MSS SELL" label                               |
+//| 3. MSS — dotted line + reversal label (no price)                 |
 //+------------------------------------------------------------------+
 
 void DrawMSS()
 {
    if(g_ms.hasMSS)
    {
-      datetime mssTime = g_ms.mssTime;
-      double   mssLevel = g_ms.mssBrokenLevel;
-      bool     isBullish = g_ms.mssIsBullish;
+      double mssLevel = g_ms.mssBrokenLevel;
+      bool isBullish = g_ms.mssIsBullish;
+      color mssColor = isBullish ? clrDodgerBlue : clrRed;
       
-      // Horizontal line at the broken level
-      string id = "MSS_LINE";
-      string objName = gd_prefix + id;
-      
+      string objName = gd_prefix + "MSS_LINE";
       if(ObjectFind(gd_chartId, objName) < 0)
          ObjectCreate(gd_chartId, objName, OBJ_HLINE, 0, 0, mssLevel);
       ObjectSetDouble(gd_chartId, objName, OBJPROP_PRICE, mssLevel);
-      
-      color mssColor = isBullish ? clrDodgerBlue : clrRed;
       ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, mssColor);
       ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 2);
       ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
-      ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "MSS Level");
       ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, true);
       
-      // Label at the line
-      string lblId = "MSS_LABEL";
-      string lblName = gd_prefix + lblId;
-      string lblText = isBullish ? "← MSS BUY REVERSAL" : "← MSS SELL REVERSAL";
-      
+      string label = isBullish ? "MSS BUY" : "MSS SELL";
+      string lblName = gd_prefix + "MSS_LABEL";
       if(ObjectFind(gd_chartId, lblName) < 0)
-         ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, mssTime, mssLevel);
-      else
-         ObjectMove(gd_chartId, lblName, 0, mssTime, mssLevel);
-      
-      ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, lblText);
+         ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, g_ms.mssTime, mssLevel);
+      ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, label);
       ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, mssColor);
-      ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 11);
+      ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 10);
       ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
       ObjectSetInteger(gd_chartId, lblName, OBJPROP_ANCHOR, ANCHOR_LEFT);
    }
@@ -307,10 +228,7 @@ void DrawMSS()
 }
 
 //+------------------------------------------------------------------+
-//| 4. DRAW BOS ZONES (Continuation)                                 |
-//| Horizontal lines at each broken swing level                      |
-//| Internal = different color from external                         |
-//| Shows "BOS x2 VALID" or "BOS x1 IGNORE" label                   |
+//| 4. BOS — dotted lines at broken levels (NO price labels)         |
 //+------------------------------------------------------------------+
 
 void DrawBOS()
@@ -323,7 +241,6 @@ void DrawBOS()
       
       if(isBullish && ArraySize(g_swingHighs) > 0)
       {
-         // Draw horizontal lines at the most recent body-broken swing highs
          int drawCount = MathMin(breaks, ArraySize(g_swingHighs));
          for(int i = 0; i < drawCount; i++)
          {
@@ -338,46 +255,14 @@ void DrawBOS()
             ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 1);
             ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, true);
-            
-            // Label at the line: price level
-            string lblId = "BOS_HL_" + IntegerToString(i);
-            string lblName = gd_prefix + lblId;
-            string levelText = DoubleToString(level, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS));
-            if(ObjectFind(gd_chartId, lblName) < 0)
-               ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, g_swingHighs[i].time, level);
-            ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "BOS " + levelText);
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, bosColor);
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 8);
-            ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
          }
          
-         // Cleanup unused BOS_H objects
          int maxToKeep = breaks + 2;
          for(int i = maxToKeep; i < 100; i++)
          {
             if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_H_" + IntegerToString(i)))
                break;
          }
-         
-         // Label
-         string lblId = "BOS_LABEL";
-         string lblName = gd_prefix + lblId;
-         string lblText = "BOS x" + IntegerToString(breaks) + " ";
-         lblText += (breaks >= BOS_MIN_MULTIPLE) ? "VALID ✓" : "IGNORE (single)";
-         lblText += " → " + (isBullish ? "BUYS" : "SELLS");
-         
-         color lblColor = (breaks >= BOS_MIN_MULTIPLE) ? clrLimeGreen : clrDarkGray;
-         
-         if(ObjectFind(gd_chartId, lblName) < 0)
-            ObjectCreate(gd_chartId, lblName, OBJ_LABEL, 0, 0, 0);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_XDISTANCE, 10);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_YDISTANCE, 190);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-         ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, lblText);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, lblColor);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 12);
-         ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
       }
       else if(!isBullish && ArraySize(g_swingLows) > 0)
       {
@@ -395,18 +280,6 @@ void DrawBOS()
             ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 1);
             ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, true);
-            
-            // Label at the line
-            string lblId = "BOS_LL_" + IntegerToString(i);
-            string lblName = gd_prefix + lblId;
-            string levelText = DoubleToString(level, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS));
-            if(ObjectFind(gd_chartId, lblName) < 0)
-               ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, g_swingLows[i].time, level);
-            ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "BOS " + levelText);
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, bosColor);
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 8);
-            ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_ANCHOR, ANCHOR_TOP);
          }
          
          int maxToKeep = breaks + 2;
@@ -415,188 +288,124 @@ void DrawBOS()
             if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_L_" + IntegerToString(i)))
                break;
          }
-         
-         string lblId = "BOS_LABEL";
-         string lblName = gd_prefix + lblId;
-         string lblText = "BOS x" + IntegerToString(breaks) + " ";
-         lblText += (breaks >= BOS_MIN_MULTIPLE) ? "VALID ✓" : "IGNORE (single)";
-         lblText += " → " + (isBullish ? "BUYS" : "SELLS");
-         
-         color lblColor = (breaks >= BOS_MIN_MULTIPLE) ? clrLimeGreen : clrDarkGray;
-         
-         if(ObjectFind(gd_chartId, lblName) < 0)
-            ObjectCreate(gd_chartId, lblName, OBJ_LABEL, 0, 0, 0);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_XDISTANCE, 10);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_YDISTANCE, 190);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-         ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, lblText);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, lblColor);
-         ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 12);
-         ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
       }
    }
    else
    {
-      // Clean up BOS objects
       ObjectDelete(gd_chartId, gd_prefix + "BOS_LABEL");
       for(int i = 0; i < 100; i++)
       {
          if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_H_" + IntegerToString(i)))
          if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_L_" + IntegerToString(i)))
-         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_HL_" + IntegerToString(i)))
-         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_LL_" + IntegerToString(i)))
             break;
       }
    }
 }
 
 //+------------------------------------------------------------------+
-//| 5. DRAW HH/HL/LH/LL CONFIRMATION SEQUENCE                       |
-//| Shows arrows with HH, HL, LH, LL labels at each swing point      |
+//| 5. SEQUENCE LABELS — just HH/HL/LH/LL (no numbers)              |
 //+------------------------------------------------------------------+
 
 void DrawSwingSequence()
 {
-   bool isUp = (g_ms.trend == TREND_UPTREND);
-   bool isDown = (g_ms.trend == TREND_DOWNTREND);
-   
-   if(!isUp && !isDown) return;
-   
-   // For uptrend: label each swing as HH or HL
-   if(isUp)
+   if(g_ms.trend == TREND_UPTREND)
    {
       for(int i = 0; i < MathMin(ArraySize(g_swingHighs), 10); i++)
       {
          string id = "SQH_" + IntegerToString(i);
          string objName = gd_prefix + id;
-         
          if(ObjectFind(gd_chartId, objName) < 0)
-            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, 
-                         g_swingHighs[i].time, g_swingHighs[i].price);
-         
-         // Determine if this is HH or LH relative to previous
-         string label = "HH";
-         if(i + 1 < ArraySize(g_swingHighs) && g_swingHighs[i].price < g_swingHighs[i+1].price)
-            label = "LH";
-         
-         ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, label);
+            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, g_swingHighs[i].time, g_swingHighs[i].price);
+         ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "HH");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, clrOrange);
          ObjectSetInteger(gd_chartId, objName, OBJPROP_FONTSIZE, 7);
          ObjectSetString(gd_chartId, objName, OBJPROP_FONT, "Consolas");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
       }
-      
       for(int i = 0; i < MathMin(ArraySize(g_swingLows), 10); i++)
       {
          string id = "SQL_" + IntegerToString(i);
          string objName = gd_prefix + id;
-         
          if(ObjectFind(gd_chartId, objName) < 0)
-            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, 
-                         g_swingLows[i].time, g_swingLows[i].price);
-         
-         string label = "HL";
-         if(i + 1 < ArraySize(g_swingLows) && g_swingLows[i].price < g_swingLows[i+1].price)
-            label = "LL";
-         
-         ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, label);
+            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, g_swingLows[i].time, g_swingLows[i].price);
+         ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "HL");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, clrLimeGreen);
          ObjectSetInteger(gd_chartId, objName, OBJPROP_FONTSIZE, 7);
          ObjectSetString(gd_chartId, objName, OBJPROP_FONT, "Consolas");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_ANCHOR, ANCHOR_TOP);
       }
    }
-   else if(isDown)
+   else if(g_ms.trend == TREND_DOWNTREND)
    {
       for(int i = 0; i < MathMin(ArraySize(g_swingHighs), 10); i++)
       {
          string id = "SQH_" + IntegerToString(i);
          string objName = gd_prefix + id;
-         
          if(ObjectFind(gd_chartId, objName) < 0)
-            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, 
-                         g_swingHighs[i].time, g_swingHighs[i].price);
-         
-         string label = "LH";
-         if(i + 1 < ArraySize(g_swingHighs) && g_swingHighs[i].price > g_swingHighs[i+1].price)
-            label = "HH";
-         
-         ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, label);
+            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, g_swingHighs[i].time, g_swingHighs[i].price);
+         ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "LH");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, clrRed);
          ObjectSetInteger(gd_chartId, objName, OBJPROP_FONTSIZE, 7);
          ObjectSetString(gd_chartId, objName, OBJPROP_FONT, "Consolas");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
       }
-      
       for(int i = 0; i < MathMin(ArraySize(g_swingLows), 10); i++)
       {
          string id = "SQL_" + IntegerToString(i);
          string objName = gd_prefix + id;
-         
          if(ObjectFind(gd_chartId, objName) < 0)
-            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, 
-                         g_swingLows[i].time, g_swingLows[i].price);
-         
-         string label = "LL";
-         if(i + 1 < ArraySize(g_swingLows) && g_swingLows[i].price > g_swingLows[i+1].price)
-            label = "HL";
-         
-         ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, label);
+            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, g_swingLows[i].time, g_swingLows[i].price);
+         ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "LL");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, clrRed);
          ObjectSetInteger(gd_chartId, objName, OBJPROP_FONTSIZE, 7);
          ObjectSetString(gd_chartId, objName, OBJPROP_FONT, "Consolas");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_ANCHOR, ANCHOR_TOP);
       }
    }
-   
-   // Cleanup excess SQ objects
-   CleanupObjects("SQH_", 10);
-   CleanupObjects("SQL_", 10);
+   else
+   {
+      CleanupObjects("SQH_", 0);
+      CleanupObjects("SQL_", 0);
+   }
 }
 
 //+------------------------------------------------------------------+
-//| 6. DRAW INTERNAL vs EXTERNAL ZONE LABELS                        |
-//| Zones made during current trend = "INTERNAL"                     |
-//| Zones from previous trend = "EXTERNAL"                           |
+//| 6. ZONE LABELS — just "EXT" on external zones                   |
 //+------------------------------------------------------------------+
 
 void DrawZoneLabels()
 {
-   if(g_ms.trend != TREND_UPTREND && g_ms.trend != TREND_DOWNTREND) return;
+   if(g_ms.trend != TREND_UPTREND && g_ms.trend != TREND_DOWNTREND)
+   {
+      CleanupObjects("EXT_H_", 0);
+      CleanupObjects("EXT_L_", 0);
+      return;
+   }
    
    bool isUp = (g_ms.trend == TREND_UPTREND);
    int hCount = ArraySize(g_swingHighs);
    int lCount = ArraySize(g_swingLows);
    
-   // In uptrend: recent swings are internal, older ones are external
-   // Internal = supports current trend
-   // External = from the previous opposite trend
-   
-   // Label external zones (oldest swings that don't fit the current trend pattern)
    for(int i = 0; i < MathMin(hCount, 5); i++)
    {
       bool isExternal = false;
       if(isUp && i + 1 < hCount && g_swingHighs[i].price < g_swingHighs[i+1].price)
-         isExternal = true;  // This high is lower than the previous = from downtrend
+         isExternal = true;
       if(!isUp && i + 1 < hCount && g_swingHighs[i].price > g_swingHighs[i+1].price)
          isExternal = true;
       
       if(isExternal)
       {
-         string id = "EXT_H_" + IntegerToString(i);
-         string objName = gd_prefix + id;
+         string objName = gd_prefix + "EXT_H_" + IntegerToString(i);
          if(ObjectFind(gd_chartId, objName) < 0)
-            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, 
-                         g_swingHighs[i].time, g_swingHighs[i].price);
+            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, g_swingHighs[i].time, g_swingHighs[i].price);
          ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "EXT");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, clrGray);
          ObjectSetInteger(gd_chartId, objName, OBJPROP_FONTSIZE, 7);
          ObjectSetInteger(gd_chartId, objName, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
       }
       else
-      {
          ObjectDelete(gd_chartId, gd_prefix + "EXT_H_" + IntegerToString(i));
-      }
    }
    
    for(int i = 0; i < MathMin(lCount, 5); i++)
@@ -609,53 +418,43 @@ void DrawZoneLabels()
       
       if(isExternal)
       {
-         string id = "EXT_L_" + IntegerToString(i);
-         string objName = gd_prefix + id;
+         string objName = gd_prefix + "EXT_L_" + IntegerToString(i);
          if(ObjectFind(gd_chartId, objName) < 0)
-            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, 
-                         g_swingLows[i].time, g_swingLows[i].price);
+            ObjectCreate(gd_chartId, objName, OBJ_TEXT, 0, g_swingLows[i].time, g_swingLows[i].price);
          ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "EXT");
          ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, clrGray);
          ObjectSetInteger(gd_chartId, objName, OBJPROP_FONTSIZE, 7);
          ObjectSetInteger(gd_chartId, objName, OBJPROP_ANCHOR, ANCHOR_TOP);
       }
       else
-      {
          ObjectDelete(gd_chartId, gd_prefix + "EXT_L_" + IntegerToString(i));
-      }
    }
 }
 
 //+------------------------------------------------------------------+
-//| 7. DRAW BIAS INDICATOR                                           |
-//| Shows directional bias on the right edge of the chart            |
+//| 7. BIAS INDICATOR — minimal                                      |
 //+------------------------------------------------------------------+
 
 void DrawBiasIndicator(string biasStr)
 {
-   string id = "BIAS_INDICATOR";
-   string objName = gd_prefix + id;
+   color clr = clrGray;
+   if(StringFind(biasStr, "BUYS") >= 0) clr = clrLimeGreen;
+   else if(StringFind(biasStr, "SELLS") >= 0) clr = clrRed;
    
-   color biasColor = clrGray;
-   if(StringFind(biasStr, "BUYS") >= 0)
-      biasColor = clrLimeGreen;
-   else if(StringFind(biasStr, "SELLS") >= 0)
-      biasColor = clrRed;
-   
+   string objName = gd_prefix + "BIAS_INDICATOR";
    if(ObjectFind(gd_chartId, objName) < 0)
       ObjectCreate(gd_chartId, objName, OBJ_LABEL, 0, 0, 0);
-   
    ObjectSetInteger(gd_chartId, objName, OBJPROP_XDISTANCE, 10);
    ObjectSetInteger(gd_chartId, objName, OBJPROP_YDISTANCE, 170);
    ObjectSetInteger(gd_chartId, objName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "BIAS: " + biasStr);
-   ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, biasColor);
-   ObjectSetInteger(gd_chartId, objName, OBJPROP_FONTSIZE, 11);
+   ObjectSetString(gd_chartId, objName, OBJPROP_TEXT, "Bias: " + biasStr);
+   ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, clr);
+   ObjectSetInteger(gd_chartId, objName, OBJPROP_FONTSIZE, 10);
    ObjectSetString(gd_chartId, objName, OBJPROP_FONT, "Consolas");
 }
 
 //+------------------------------------------------------------------+
-//| HELPER: Cleanup excess objects when count decreases              |
+//| HELPER: cleanup excess objects                                   |
 //+------------------------------------------------------------------+
 
 void CleanupObjects(string prefix, int maxKeep)
@@ -666,12 +465,12 @@ void CleanupObjects(string prefix, int maxKeep)
       if(ObjectFind(gd_chartId, objName) >= 0)
          ObjectDelete(gd_chartId, objName);
       else
-         break;  // No more objects with this prefix
+         break;
    }
 }
 
 //+------------------------------------------------------------------+
-//| MAIN DRAW FUNCTION — Called each update                          |
+//| MAIN — draw everything                                           |
 //+------------------------------------------------------------------+
 
 void DrawAllStructures(string biasStr)

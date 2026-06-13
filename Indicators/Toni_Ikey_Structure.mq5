@@ -213,8 +213,7 @@ void DisplayInfoPanel(string biasStr)
    // Line 4: MSS
    if(g_ms.hasMSS)
    {
-      string m = "⚡ MSS: " + (g_ms.mssIsBullish ? "BUY" : "SELL") + " reversal at "
-               + DoubleToString(g_ms.mssBrokenLevel, _Digits);
+      string m = "⚡ MSS: " + (g_ms.mssIsBullish ? "BUY" : "SELL") + " reversal";
       PanelLabel("MSS", x, y, m, clrOrange, fs + 1);
    }
    else
@@ -228,8 +227,8 @@ void DisplayInfoPanel(string biasStr)
                + (g_ms.bosIsBullish ? " ↑" : " ↓");
       if(g_ms.bosBreaksCount >= BOS_MIN_MULTIPLE)
       {
-         b += "  VALID ✓";
-         PanelLabel("BOS", x, y, b, clrCyan, fs + 1);
+         b += "  VALID";
+         PanelLabel("BOS", x, y, b, clrCyan, fs);
       }
       else
       {
@@ -243,12 +242,11 @@ void DisplayInfoPanel(string biasStr)
    
    // Line 6: Trendline
    if(g_ms.uptrendLine.valid)
-      PanelLabel("TL", x, y, "Trendline: Uptrend channel", clrLimeGreen, fs);
+      PanelLabel("TL", x, y, "Trendline: Uptrend", clrLimeGreen, fs);
    else if(g_ms.downtrendLine.valid)
-      PanelLabel("TL", x, y, "Trendline: Downtrend channel", clrRed, fs);
+      PanelLabel("TL", x, y, "Trendline: Downtrend", clrRed, fs);
    else if(g_ms.rangeResistance.valid)
-      PanelLabel("TL", x, y, "Range: " + DoubleToString(g_ms.rangeSupport.point2Price, _Digits)
-         + " — " + DoubleToString(g_ms.rangeResistance.point2Price, _Digits), clrYellow, fs);
+      PanelLabel("TL", x, y, "Range", clrYellow, fs);
    else
       PanelLabel("TL", x, y, "Trendline: none", clrGray, fs);
    y += 18;
