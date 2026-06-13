@@ -397,15 +397,15 @@ bool DetectMSS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
 //+------------------------------------------------------------------+
 //| 5. BREAK OF STRUCTURE (BOS) — CONTINUATION CONCEPT (Definition 2)|
 //|                                                                   |
-//| BOS = price keeps breaking key levels (swing highs/lows) while   |
-//|       maintaining the current trend direction.                   |
+//| BOS = Any candle whose FULL BODY (close) breaks a swing level.    |
+//|       Not just a wick touch — the candle must CLOSE beyond it.    |
 //|                                                                   |
-//| Uptrend:  price breaks previous swing highs (higher high)         |
-//| Downtrend: price breaks previous swing lows (lower low)           |
+//| Uptrend BOS:  candle close > previous swing high                  |
+//| Downtrend BOS: candle close < previous swing low                  |
 //|                                                                   |
 //| CRITICAL RULE — Single vs Multiple BOS:                          |
-//|   Single BOS (only 1 level broken)  → IGNORE                     |
-//|   Multiple/Double BOS (2+ levels)   → valid for trading           |
+//|   Single BOS (only 1 level body-broken)  → IGNORE                |
+//|   Multiple/Double BOS (2+ levels body-broken) → valid for trading |
 //+------------------------------------------------------------------+
 
 bool DetectBOS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
@@ -423,41 +423,29 @@ bool DetectBOS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
    
    // BOS requires a trending market
    if(g_ms.trend != TREND_UPTREND && g_ms.trend != TREND_DOWNTREND)
-   {
-      // For ranging markets: BOS = breakout of the range (Definition 2)
-      // This is handled separately
       return false;
-   }
+   
+   int hCount = ArraySize(g_swingHighs);
+   int lCount = ArraySize(g_swingLows);
    
    // ---- BOS in UPTREND ----
-   // Count how many previous swing highs have been broken
+   // Any candle whose FULL BODY breaks previous swing highs
    if(g_ms.trend == TREND_UPTREND)
    {
-      int hCount = ArraySize(g_swingHighs);
       if(hCount < 2) return false;
-      
-      // Use the most recent completed bar
-      double currentPrice = iClose(symbol, tf, 1);
-      double currentHigh = iHigh(symbol, tf, 1);
       
       int breaks = 0;
       
-      // Count how many previous swing highs the current price has exceeded
-      for(int i = 0; i < hCount; i++)
+      // Walk back through recent candles — any one that closed above a swing high = BOS
+      for(int b = 1; b <= MathMin(5, checkBars); b++)
       {
-         if(currentHigh > g_swingHighs[i].price)
-            breaks++;
-      }
-      
-      // Additional check: look for momentum BOS (price just broke through within last few bars)
-      for(int b = 1; b <= MathMin(3, checkBars); b++)
-      {
-         double barHigh = iHigh(symbol, tf, b);
+         double barClose = iClose(symbol, tf, b);
          int barBreaks = 0;
          
          for(int i = 0; i < hCount; i++)
          {
-            if(barHigh > g_swingHighs[i].price)
+            // Full body break: close must be ABOVE the swing high
+            if(barClose > g_swingHighs[i].price)
                barBreaks++;
          }
          
@@ -470,42 +458,28 @@ bool DetectBOS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
       if(breaks >= 1)
       {
          g_ms.hasBOS = true;
-         g_ms.bosIsBullish = true;  // BOS to upside
-         
-         if(breaks >= BOS_MIN_MULTIPLE)
-            return true;  // Multiple BOS — VALID for trading
-         else
-            return true;  // Single BOS — detected but should be IGNORED (Definition 2)
+         g_ms.bosIsBullish = true;
+         return true;
       }
    }
    
    // ---- BOS in DOWNTREND ----
+   // Any candle whose FULL BODY breaks previous swing lows
    if(g_ms.trend == TREND_DOWNTREND)
    {
-      int lCount = ArraySize(g_swingLows);
       if(lCount < 2) return false;
-      
-      double currentPrice = iClose(symbol, tf, 1);
-      double currentLow = iLow(symbol, tf, 1);
       
       int breaks = 0;
       
-      // Count how many previous swing lows have been broken
-      for(int i = 0; i < lCount; i++)
+      for(int b = 1; b <= MathMin(5, checkBars); b++)
       {
-         if(currentLow < g_swingLows[i].price)
-            breaks++;
-      }
-      
-      // Check recent bars too
-      for(int b = 1; b <= MathMin(3, checkBars); b++)
-      {
-         double barLow = iLow(symbol, tf, b);
+         double barClose = iClose(symbol, tf, b);
          int barBreaks = 0;
          
          for(int i = 0; i < lCount; i++)
          {
-            if(barLow < g_swingLows[i].price)
+            // Full body break: close must be BELOW the swing low
+            if(barClose < g_swingLows[i].price)
                barBreaks++;
          }
          
@@ -518,12 +492,8 @@ bool DetectBOS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
       if(breaks >= 1)
       {
          g_ms.hasBOS = true;
-         g_ms.bosIsBullish = false;  // BOS to downside
-         
-         if(breaks >= BOS_MIN_MULTIPLE)
-            return true;  // Multiple BOS — VALID
-         else
-            return true;  // Single BOS — detected, should be IGNORED
+         g_ms.bosIsBullish = false;
+         return true;
       }
    }
    
@@ -553,29 +523,30 @@ bool DetectRangeBreakout(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
    double resistance = g_swingHighs[0].price;  // Top of range
    double support    = g_swingLows[0].price;   // Bottom of range
    
-   // Check if recent bars have broken out of the range
-   double recentHigh = iHigh(symbol, tf, 1);
-   double recentLow  = iLow(symbol, tf, 1);
-   double recentClose = iClose(symbol, tf, 1);
-   
-   // Breakout above resistance (bullish continuation)
-   if(recentHigh > resistance && recentClose > resistance)
+   // Check if recent bars have broken out of the range (full body break)
+   for(int b = 1; b <= MathMin(5, checkBars); b++)
    {
-      // Note: In a ranging market, continuation means trading in the breakout direction
-      // A retest is expected before further continuation (Definition 2)
-      g_ms.hasBOS = true;
-      g_ms.bosBreaksCount = 1;  // Single break of the range
-      g_ms.bosIsBullish = true;
-      return true;
-   }
-   
-   // Breakout below support (bearish continuation)
-   if(recentLow < support && recentClose < support)
-   {
-      g_ms.hasBOS = true;
-      g_ms.bosBreaksCount = 1;
-      g_ms.bosIsBullish = false;
-      return true;
+      double barHigh  = iHigh(symbol, tf, b);
+      double barLow   = iLow(symbol, tf, b);
+      double barClose = iClose(symbol, tf, b);
+      
+      // Breakout above resistance — full body must close above it
+      if(barClose > resistance)
+      {
+         g_ms.hasBOS = true;
+         g_ms.bosBreaksCount = 1;
+         g_ms.bosIsBullish = true;
+         return true;
+      }
+      
+      // Breakout below support — full body must close below it
+      if(barClose < support)
+      {
+         g_ms.hasBOS = true;
+         g_ms.bosBreaksCount = 1;
+         g_ms.bosIsBullish = false;
+         return true;
+      }
    }
    
    return false;

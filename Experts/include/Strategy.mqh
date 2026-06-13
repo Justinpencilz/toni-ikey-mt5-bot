@@ -109,7 +109,8 @@ struct MarketStructure
 #define MSS_CLOSE_BEYOND       true  // Must close beyond the broken level
 
 // --- BOS Zone Counting ---
-#define BOS_MIN_MULTIPLE       2     // Minimum zones broken for multiple BOS
+#define BOS_MIN_MULTIPLE       2     // Minimum zones body-broken for multiple BOS
+#define BOS_BODY_ONLY          1     // Only count breaks where candle CLOSES beyond level
 #define BOS_LOOKBACK_BARS      30    // Bars to look back for zone counting
 
 //+------------------------------------------------------------------+

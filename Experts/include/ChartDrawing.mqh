@@ -318,8 +318,7 @@ void DrawBOS()
       
       if(isBullish && ArraySize(g_swingHighs) > 0)
       {
-         // Draw horizontal lines at the most recent broken swing highs
-         // (these were already identified by DetectBOS)
+         // Draw horizontal lines at the most recent body-broken swing highs
          int drawCount = MathMin(breaks, ArraySize(g_swingHighs));
          for(int i = 0; i < drawCount; i++)
          {
@@ -334,6 +333,18 @@ void DrawBOS()
             ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 1);
             ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, true);
+            
+            // Label at the line: price level
+            string lblId = "BOS_HL_" + IntegerToString(i);
+            string lblName = gd_prefix + lblId;
+            string levelText = DoubleToString(level, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS));
+            if(ObjectFind(gd_chartId, lblName) < 0)
+               ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, g_swingHighs[i].time, level);
+            ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "BOS " + levelText);
+            ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, bosColor);
+            ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 8);
+            ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
+            ObjectSetInteger(gd_chartId, lblName, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
          }
          
          // Cleanup unused BOS_H objects
@@ -379,6 +390,18 @@ void DrawBOS()
             ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 1);
             ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, true);
+            
+            // Label at the line
+            string lblId = "BOS_LL_" + IntegerToString(i);
+            string lblName = gd_prefix + lblId;
+            string levelText = DoubleToString(level, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS));
+            if(ObjectFind(gd_chartId, lblName) < 0)
+               ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, g_swingLows[i].time, level);
+            ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "BOS " + levelText);
+            ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, bosColor);
+            ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 8);
+            ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
+            ObjectSetInteger(gd_chartId, lblName, OBJPROP_ANCHOR, ANCHOR_TOP);
          }
          
          int maxToKeep = breaks + 2;
@@ -415,6 +438,8 @@ void DrawBOS()
       {
          if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_H_" + IntegerToString(i)))
          if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_L_" + IntegerToString(i)))
+         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_HL_" + IntegerToString(i)))
+         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_LL_" + IntegerToString(i)))
             break;
       }
    }
