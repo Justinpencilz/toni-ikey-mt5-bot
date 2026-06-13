@@ -191,51 +191,56 @@ void DrawTrendlines()
    }
    else if(g_ms.rangeResistance.valid && g_ms.rangeSupport.valid)
    {
-      // Range support line
-      string idSup = "RANGE_SUPPORT";
-      datetime supT1 = g_ms.rangeSupport.point1Time;
-      double   supP1 = g_ms.rangeSupport.point1Price;
-      datetime supT2 = g_ms.rangeSupport.point2Time;
-      
-      DrawObject(idSup, OBJ_TREND, supT1, supP1, supT2, supP1);
-      ObjectSetInteger(gd_chartId, gd_prefix + idSup, OBJPROP_COLOR, clrYellow);
-      ObjectSetInteger(gd_chartId, gd_prefix + idSup, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(gd_chartId, gd_prefix + idSup, OBJPROP_STYLE, STYLE_DASH);
-      ObjectSetInteger(gd_chartId, gd_prefix + idSup, OBJPROP_RAY_RIGHT, true);
-      ObjectSetInteger(gd_chartId, gd_prefix + idSup, OBJPROP_BACK, true);
-      
-      // Label: "Support"
-      string lblS = "RANGE_SUPPORT_LBL";
-      string lblNameS = gd_prefix + lblS;
-      if(ObjectFind(gd_chartId, lblNameS) < 0)
-         ObjectCreate(gd_chartId, lblNameS, OBJ_TEXT, 0, supT2, supP1);
-      ObjectSetString(gd_chartId, lblNameS, OBJPROP_TEXT, "Support");
-      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_COLOR, clrYellow);
-      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_FONTSIZE, 9);
-      ObjectSetString(gd_chartId, lblNameS, OBJPROP_FONT, "Consolas");
-      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_ANCHOR, ANCHOR_TOP);
-      
-      // Range resistance line
+      // Range: STRAIGHT HORIZONTAL lines at averaged levels
+      // Resistance line
       string idRes = "RANGE_RESISTANCE";
-      double   resP1 = g_ms.rangeResistance.point1Price;
-      datetime resT2 = g_ms.rangeResistance.point2Time;
+      string objRes = gd_prefix + idRes;
+      double resPrice = g_ms.rangeResistance.point1Price;
       
-      DrawObject(idRes, OBJ_TREND, supT1, resP1, resT2, resP1);
-      ObjectSetInteger(gd_chartId, gd_prefix + idRes, OBJPROP_COLOR, clrYellow);
-      ObjectSetInteger(gd_chartId, gd_prefix + idRes, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(gd_chartId, gd_prefix + idRes, OBJPROP_STYLE, STYLE_DASH);
-      ObjectSetInteger(gd_chartId, gd_prefix + idRes, OBJPROP_RAY_RIGHT, true);
-      ObjectSetInteger(gd_chartId, gd_prefix + idRes, OBJPROP_BACK, true);
+      if(ObjectFind(gd_chartId, objRes) < 0)
+         ObjectCreate(gd_chartId, objRes, OBJ_HLINE, 0, 0, resPrice);
+      ObjectSetDouble(gd_chartId, objRes, OBJPROP_PRICE, resPrice);
+      ObjectSetInteger(gd_chartId, objRes, OBJPROP_COLOR, clrYellow);
+      ObjectSetInteger(gd_chartId, objRes, OBJPROP_WIDTH, 1);
+      ObjectSetInteger(gd_chartId, objRes, OBJPROP_STYLE, STYLE_DASH);
+      ObjectSetInteger(gd_chartId, objRes, OBJPROP_BACK, true);
       
+      // Label: "Resistance XXXXX"
       string lblR = "RANGE_RESISTANCE_LBL";
       string lblNameR = gd_prefix + lblR;
       if(ObjectFind(gd_chartId, lblNameR) < 0)
-         ObjectCreate(gd_chartId, lblNameR, OBJ_TEXT, 0, resT2, resP1);
-      ObjectSetString(gd_chartId, lblNameR, OBJPROP_TEXT, "Resistance");
+         ObjectCreate(gd_chartId, lblNameR, OBJ_TEXT, 0, g_ms.rangeResistance.point2Time, resPrice);
+      string resText = "Resistance " + DoubleToString(resPrice, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS));
+      ObjectSetString(gd_chartId, lblNameR, OBJPROP_TEXT, resText);
       ObjectSetInteger(gd_chartId, lblNameR, OBJPROP_COLOR, clrYellow);
       ObjectSetInteger(gd_chartId, lblNameR, OBJPROP_FONTSIZE, 9);
       ObjectSetString(gd_chartId, lblNameR, OBJPROP_FONT, "Consolas");
       ObjectSetInteger(gd_chartId, lblNameR, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
+      
+      // Support line
+      string idSup = "RANGE_SUPPORT";
+      string objSup = gd_prefix + idSup;
+      double supPrice = g_ms.rangeSupport.point1Price;
+      
+      if(ObjectFind(gd_chartId, objSup) < 0)
+         ObjectCreate(gd_chartId, objSup, OBJ_HLINE, 0, 0, supPrice);
+      ObjectSetDouble(gd_chartId, objSup, OBJPROP_PRICE, supPrice);
+      ObjectSetInteger(gd_chartId, objSup, OBJPROP_COLOR, clrYellow);
+      ObjectSetInteger(gd_chartId, objSup, OBJPROP_WIDTH, 1);
+      ObjectSetInteger(gd_chartId, objSup, OBJPROP_STYLE, STYLE_DASH);
+      ObjectSetInteger(gd_chartId, objSup, OBJPROP_BACK, true);
+      
+      // Label: "Support XXXXX"
+      string lblS = "RANGE_SUPPORT_LBL";
+      string lblNameS = gd_prefix + lblS;
+      if(ObjectFind(gd_chartId, lblNameS) < 0)
+         ObjectCreate(gd_chartId, lblNameS, OBJ_TEXT, 0, g_ms.rangeSupport.point2Time, supPrice);
+      string supText = "Support " + DoubleToString(supPrice, gd_symbol == "" ? _Digits : (int)SymbolInfoInteger(gd_symbol, SYMBOL_DIGITS));
+      ObjectSetString(gd_chartId, lblNameS, OBJPROP_TEXT, supText);
+      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_COLOR, clrYellow);
+      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_FONTSIZE, 9);
+      ObjectSetString(gd_chartId, lblNameS, OBJPROP_FONT, "Consolas");
+      ObjectSetInteger(gd_chartId, lblNameS, OBJPROP_ANCHOR, ANCHOR_TOP);
    }
    else
    {
