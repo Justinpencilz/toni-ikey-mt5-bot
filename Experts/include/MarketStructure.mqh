@@ -214,19 +214,17 @@ ENUM_TREND_DIRECTION DetermineTrend(string symbol, ENUM_TIMEFRAMES tf)
 
 //+------------------------------------------------------------------+
 //| 3. TRENDLINE CONSTRUCTION (Definition 1)                         |
-//| Uptrend line: connect TWO OR MORE higher lows, slanted upward    |
-//|   → Scan swing lows from old to new. Only keep those that are    |
-//|     progressively HIGHER. Draw line through the first and last.  |
 //|                                                                   |
-//| Downtrend line: connect TWO OR MORE lower highs, slanted downward|
-//|   → Scan swing highs from old to new. Only keep those that are   |
-//|     progressively LOWER. Draw line through the first and last.   |
+//| Uptrend:   draw a line connecting TWO OR MORE HIGHER LOWS         |
+//|            (lows that are progressively higher), slanted upward.  |
+//|            Line extends to the right.                             |
 //|                                                                   |
-//| Range: draw a STRAIGHT HORIZONTAL line connecting highs, and     |
-//|        another connecting lows.                                   |
-//|   → Average the recent swing highs for resistance level          |
-//|   → Average the recent swing lows for support level              |
-//|   → Both lines are flat (slope = 0)                               |
+//| Downtrend: draw a line connecting TWO OR MORE LOWER HIGHS         |
+//|            (highs that are progressively lower), slanted downward.|
+//|            Line extends to the right.                             |
+//|                                                                   |
+//| Range:     draw a STRAIGHT HORIZONTAL line connecting highs       |
+//|            (resistance), and another connecting lows (support).   |
 //+------------------------------------------------------------------+
 
 void BuildTrendlines(string symbol, ENUM_TIMEFRAMES tf)
@@ -239,125 +237,157 @@ void BuildTrendlines(string symbol, ENUM_TIMEFRAMES tf)
    int hCount = ArraySize(g_swingHighs);
    int lCount = ArraySize(g_swingLows);
    
-   // ---- UPTREND LINE: connect 2+ HIGHER LOWS (slanted upward) ----
-   // Walk through swing lows from oldest to newest, collecting only
-   // those that form a proper "higher low" sequence.
+   // ---- UPTREND LINE ----
+   // Find the 2 most recent swing lows. In a confirmed uptrend
+   // (HH/HL sequence), the most recent low should be higher than
+   // the previous low. Connect them.
    if(g_ms.trend == TREND_UPTREND && lCount >= 2)
    {
-      double higherLows[];
-      datetime higherLowTimes[];
-      ArrayResize(higherLows, lCount);
-      ArrayResize(higherLowTimes, lCount);
+      // Try the 2 most recent lows first
+      double lowA = g_swingLows[1].price;  // Older
+      double lowB = g_swingLows[0].price;  // Newer
+      datetime timeA = g_swingLows[1].time;
+      datetime timeB = g_swingLows[0].time;
       
-      int hlCount = 0;
-      
-      // Swing lows array: [0]=most recent, [end]=oldest
-      // Walk from oldest to newest so we can build the sequence
-      for(int i = lCount - 1; i >= 0; i--)
-      {
-         double price = g_swingLows[i].price;
-         
-         if(hlCount == 0 || price > higherLows[hlCount - 1])
-         {
-            higherLows[hlCount] = price;
-            higherLowTimes[hlCount] = g_swingLows[i].time;
-            hlCount++;
-         }
-      }
-      
-      // Need at least 2 higher lows for a trendline
-      if(hlCount >= 2)
+      // In a valid uptrend, the newer low should be higher
+      if(lowB > lowA)
       {
          g_ms.uptrendLine.valid = true;
-         // Use first (oldest) and last (newest) higher lows as anchors
-         g_ms.uptrendLine.point1Price = higherLows[0];       // Oldest
-         g_ms.uptrendLine.point1Time  = higherLowTimes[0];
-         g_ms.uptrendLine.point2Price = higherLows[hlCount - 1];  // Newest
-         g_ms.uptrendLine.point2Time  = higherLowTimes[hlCount - 1];
+         g_ms.uptrendLine.point1Price = lowA;
+         g_ms.uptrendLine.point1Time  = timeA;
+         g_ms.uptrendLine.point2Price = lowB;
+         g_ms.uptrendLine.point2Time  = timeB;
          
-         // Slope
-         double priceDiff = g_ms.uptrendLine.point2Price - g_ms.uptrendLine.point1Price;
-         double timeDiff = (double)(g_ms.uptrendLine.point2Time - g_ms.uptrendLine.point1Time);
-         if(timeDiff > 0)
-            g_ms.uptrendLine.slope = priceDiff / timeDiff;
+         double priceDiff = lowB - lowA;
+         double timeDiff  = (double)(timeB - timeA);
+         if(timeDiff > 0) g_ms.uptrendLine.slope = priceDiff / timeDiff;
+      }
+      else
+      {
+         // If the 2 most recent don't form HL, scan for 2 that do
+         for(int i = 0; i < lCount - 1; i++)
+         {
+            if(g_swingLows[i].price > g_swingLows[i + 1].price)
+            {
+               g_ms.uptrendLine.valid = true;
+               g_ms.uptrendLine.point1Price = g_swingLows[i + 1].price;
+               g_ms.uptrendLine.point1Time  = g_swingLows[i + 1].time;
+               g_ms.uptrendLine.point2Price = g_swingLows[i].price;
+               g_ms.uptrendLine.point2Time  = g_swingLows[i].time;
+               
+               double priceDiff = g_swingLows[i].price - g_swingLows[i + 1].price;
+               double timeDiff  = (double)(g_swingLows[i].time - g_swingLows[i + 1].time);
+               if(timeDiff > 0) g_ms.uptrendLine.slope = priceDiff / timeDiff;
+               break;
+            }
+         }
       }
    }
    
-   // ---- DOWNTREND LINE: connect 2+ LOWER HIGHS (slanted downward) ----
+   // ---- DOWNTREND LINE ----
+   // Find the 2 most recent swing highs. In a confirmed downtrend
+   // (LH/LL sequence), the most recent high should be lower than
+   // the previous high. Connect them.
    if(g_ms.trend == TREND_DOWNTREND && hCount >= 2)
    {
-      double lowerHighs[];
-      datetime lowerHighTimes[];
-      ArrayResize(lowerHighs, hCount);
-      ArrayResize(lowerHighTimes, hCount);
+      double highA = g_swingHighs[1].price;  // Older
+      double highB = g_swingHighs[0].price;  // Newer
+      datetime timeA = g_swingHighs[1].time;
+      datetime timeB = g_swingHighs[0].time;
       
-      int lhCount = 0;
-      
-      // Walk from oldest to newest
-      for(int i = hCount - 1; i >= 0; i--)
-      {
-         double price = g_swingHighs[i].price;
-         
-         if(lhCount == 0 || price < lowerHighs[lhCount - 1])
-         {
-            lowerHighs[lhCount] = price;
-            lowerHighTimes[lhCount] = g_swingHighs[i].time;
-            lhCount++;
-         }
-      }
-      
-      if(lhCount >= 2)
+      // In a valid downtrend, the newer high should be lower
+      if(highB < highA)
       {
          g_ms.downtrendLine.valid = true;
-         g_ms.downtrendLine.point1Price = lowerHighs[0];       // Oldest
-         g_ms.downtrendLine.point1Time  = lowerHighTimes[0];
-         g_ms.downtrendLine.point2Price = lowerHighs[lhCount - 1];  // Newest
-         g_ms.downtrendLine.point2Time  = lowerHighTimes[lhCount - 1];
+         g_ms.downtrendLine.point1Price = highA;
+         g_ms.downtrendLine.point1Time  = timeA;
+         g_ms.downtrendLine.point2Price = highB;
+         g_ms.downtrendLine.point2Time  = timeB;
          
-         double priceDiff = g_ms.downtrendLine.point2Price - g_ms.downtrendLine.point1Price;
-         double timeDiff = (double)(g_ms.downtrendLine.point2Time - g_ms.downtrendLine.point1Time);
-         if(timeDiff > 0)
-            g_ms.downtrendLine.slope = priceDiff / timeDiff;
+         double priceDiff = highB - highA;  // negative = downward slope
+         double timeDiff  = (double)(timeB - timeA);
+         if(timeDiff > 0) g_ms.downtrendLine.slope = priceDiff / timeDiff;
+      }
+      else
+      {
+         for(int i = 0; i < hCount - 1; i++)
+         {
+            if(g_swingHighs[i].price < g_swingHighs[i + 1].price)
+            {
+               g_ms.downtrendLine.valid = true;
+               g_ms.downtrendLine.point1Price = g_swingHighs[i + 1].price;
+               g_ms.downtrendLine.point1Time  = g_swingHighs[i + 1].time;
+               g_ms.downtrendLine.point2Price = g_swingHighs[i].price;
+               g_ms.downtrendLine.point2Time  = g_swingHighs[i].time;
+               
+               double priceDiff = g_swingHighs[i].price - g_swingHighs[i + 1].price;
+               double timeDiff  = (double)(g_swingHighs[i].time - g_swingHighs[i + 1].time);
+               if(timeDiff > 0) g_ms.downtrendLine.slope = priceDiff / timeDiff;
+               break;
+            }
+         }
       }
    }
    
    // ---- RANGE: STRAIGHT HORIZONTAL LINES ----
-   // Resistance = average of recent swing high prices → flat line
-   // Support    = average of recent swing low prices  → flat line
    if(g_ms.trend == TREND_RANGING)
    {
+      // Resistance: find the two highest swing highs and average them
+      // (horizontal line connecting highs)
       if(hCount >= 2)
       {
-         double totalHigh = 0;
-         int count = MathMin(5, hCount);  // Average up to 5 recent highs
-         for(int i = 0; i < count; i++)
-            totalHigh += g_swingHighs[i].price;
+         // Use the highest swing highs for resistance
+         double highest = g_swingHighs[0].price;
+         double secondHighest = highest;
+         datetime resTime = g_swingHighs[0].time;
          
-         double avgResistance = totalHigh / count;
+         for(int i = 1; i < hCount; i++)
+         {
+            if(g_swingHighs[i].price > highest)
+               highest = g_swingHighs[i].price;
+            else if(g_swingHighs[i].price > secondHighest)
+            {
+               secondHighest = g_swingHighs[i].price;
+               resTime = g_swingHighs[i].time;
+            }
+         }
+         
+         double resLevel = (highest + secondHighest) / 2.0;
          
          g_ms.rangeResistance.valid = true;
-         g_ms.rangeResistance.point1Price = avgResistance;
-         g_ms.rangeResistance.point1Time  = g_swingHighs[count - 1].time;
-         g_ms.rangeResistance.point2Price = avgResistance;  // Same price = horizontal
+         g_ms.rangeResistance.point1Price = resLevel;
+         g_ms.rangeResistance.point1Time  = g_swingHighs[hCount - 1].time;
+         g_ms.rangeResistance.point2Price = resLevel;  // Same = horizontal
          g_ms.rangeResistance.point2Time  = g_swingHighs[0].time;
-         g_ms.rangeResistance.slope = 0;  // Flat
+         g_ms.rangeResistance.slope = 0;
       }
       
+      // Support: find the two lowest swing lows and average them
       if(lCount >= 2)
       {
-         double totalLow = 0;
-         int count = MathMin(5, lCount);
-         for(int i = 0; i < count; i++)
-            totalLow += g_swingLows[i].price;
+         double lowest = g_swingLows[0].price;
+         double secondLowest = lowest;
+         datetime supTime = g_swingLows[0].time;
          
-         double avgSupport = totalLow / count;
+         for(int i = 1; i < lCount; i++)
+         {
+            if(g_swingLows[i].price < lowest)
+               lowest = g_swingLows[i].price;
+            else if(g_swingLows[i].price < secondLowest)
+            {
+               secondLowest = g_swingLows[i].price;
+               supTime = g_swingLows[i].time;
+            }
+         }
+         
+         double supLevel = (lowest + secondLowest) / 2.0;
          
          g_ms.rangeSupport.valid = true;
-         g_ms.rangeSupport.point1Price = avgSupport;
-         g_ms.rangeSupport.point1Time  = g_swingLows[count - 1].time;
-         g_ms.rangeSupport.point2Price = avgSupport;  // Same price = horizontal
+         g_ms.rangeSupport.point1Price = supLevel;
+         g_ms.rangeSupport.point1Time  = g_swingLows[lCount - 1].time;
+         g_ms.rangeSupport.point2Price = supLevel;  // Same = horizontal
          g_ms.rangeSupport.point2Time  = g_swingLows[0].time;
-         g_ms.rangeSupport.slope = 0;  // Flat
+         g_ms.rangeSupport.slope = 0;
       }
    }
 }
