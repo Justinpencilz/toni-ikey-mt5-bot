@@ -158,13 +158,6 @@ enum ENUM_MODE
    MODE_PRESENT    = 1
 };
 
-enum ENUM_LINE_STYLE
-{
-   LINE_SOLID  = 0,
-   LINE_DASHED = 1,
-   LINE_DOTTED = 2
-};
-
 //+------------------------------------------------------------------+
 //| STRUCTS                                                          |
 //+------------------------------------------------------------------+
@@ -309,13 +302,13 @@ input color            InpFVG_BearColor       = clrDeepPink;      // FVG Bear Co
 //| INPUTS — MTF Levels                                              |
 //+------------------------------------------------------------------+
 input bool             InpShowDaily           = true;             // Show Daily Levels
-input ENUM_LINE_STYLE  InpDailyStyle          = LINE_SOLID;       // Daily Line Style
+input ENUM_LINE_STYLE  InpDailyStyle          = STYLE_SOLID;      // Daily Line Style
 input color            InpDailyColor          = clrGray;          // Daily Color
 input bool             InpShowWeekly          = false;            // Show Weekly Levels
-input ENUM_LINE_STYLE  InpWeeklyStyle         = LINE_DASHED;      // Weekly Line Style
+input ENUM_LINE_STYLE  InpWeeklyStyle         = STYLE_DASH;       // Weekly Line Style
 input color            InpWeeklyColor         = clrDarkGray;      // Weekly Color
 input bool             InpShowMonthly         = false;            // Show Monthly Levels
-input ENUM_LINE_STYLE  InpMonthlyStyle        = LINE_DOTTED;      // Monthly Line Style
+input ENUM_LINE_STYLE  InpMonthlyStyle        = STYLE_DOT;        // Monthly Line Style
 input color            InpMonthlyColor        = clrDimGray;       // Monthly Color
 
 //+------------------------------------------------------------------+
@@ -556,20 +549,6 @@ void GetParsedHL(int barIndex, double &parsedHigh, double &parsedLow)
       parsedHigh = h;
       parsedLow  = l;
    }
-}
-
-//+------------------------------------------------------------------+
-//| HELPER: Line style to MQL5 constant                              |
-//+------------------------------------------------------------------+
-long GetLineStyleInt(ENUM_LINE_STYLE style)
-{
-   switch(style)
-   {
-      case LINE_SOLID:  return STYLE_SOLID;
-      case LINE_DASHED: return STYLE_DASH;
-      case LINE_DOTTED: return STYLE_DOT;
-   }
-   return STYLE_SOLID;
 }
 
 //+------------------------------------------------------------------+
@@ -1513,7 +1492,7 @@ void DrawSwingPointLabels(int rates_total, const datetime &time[],
 //| STAGE 8: MTF LEVELS — Daily / Weekly / Monthly                 |
 //|                                                                |
 //+------------------------------------------------------------------+
-void DrawMTFLevel(ENUM_TIMEFRAMES tf, color lineColor, long style,
+void DrawMTFLevel(ENUM_TIMEFRAMES tf, color lineColor, ENUM_LINE_STYLE style,
                   string highLabel, string lowLabel, datetime currentTime)
 {
    double prevHigh = iHigh(_Symbol, tf, 1);
@@ -1578,13 +1557,13 @@ void DrawMTFLevels(datetime currentTime)
    ENUM_TIMEFRAMES currentTF = Period();
    
    if(InpShowDaily && currentTF < PERIOD_D1)
-      DrawMTFLevel(PERIOD_D1, InpDailyColor, GetLineStyleInt(InpDailyStyle), "PDH", "PDL", currentTime);
+      DrawMTFLevel(PERIOD_D1, InpDailyColor, InpDailyStyle, "PDH", "PDL", currentTime);
    
    if(InpShowWeekly && currentTF < PERIOD_W1)
-      DrawMTFLevel(PERIOD_W1, InpWeeklyColor, GetLineStyleInt(InpWeeklyStyle), "PWH", "PWL", currentTime);
+      DrawMTFLevel(PERIOD_W1, InpWeeklyColor, InpWeeklyStyle, "PWH", "PWL", currentTime);
    
    if(InpShowMonthly && currentTF < PERIOD_MN1)
-      DrawMTFLevel(PERIOD_MN1, InpMonthlyColor, GetLineStyleInt(InpMonthlyStyle), "PMH", "PML", currentTime);
+      DrawMTFLevel(PERIOD_MN1, InpMonthlyColor, InpMonthlyStyle, "PMH", "PML", currentTime);
 }
 
 //+------------------------------------------------------------------+
