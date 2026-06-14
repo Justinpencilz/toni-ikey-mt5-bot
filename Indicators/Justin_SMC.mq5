@@ -1,11 +1,11 @@
 //+------------------------------------------------------------------+
-//|                                       SMC_LuxAlgo.mq5             |
-//|  Smart Money Concepts — Exact LuxAlgo Pine Script Port           |
+//|                                          Justin_SMC.mq5           |
+//|  Smart Money Concepts — Justin's SMC Indicator                   |
 //+------------------------------------------------------------------+
 #property copyright "Justinpencilz"
 #property link      "https://github.com/Justinpencilz"
 #property version   "1.00"
-#property description "LuxAlgo SMC: BOS/CHoCH, Order Blocks, FVG, EQH/EQL, PD Array, MTF Levels"
+#property description "Justin SMC: BOS/CHoCH, Order Blocks, FVG, EQH/EQL, PD Array, MTF Levels"
 #property indicator_chart_window
 #property indicator_buffers 14
 #property indicator_plots   14
@@ -1192,7 +1192,7 @@ void OnInit()
    g_atrHandle=iATR(_Symbol,PERIOD_CURRENT,200);
    if(g_atrHandle==INVALID_HANDLE) Print("WARN: ATR handle failed");
    
-   IndicatorSetString(INDICATOR_SHORTNAME,"SMC LuxAlgo ("+IntegerToString(InpSwingLength)+")");
+   IndicatorSetString(INDICATOR_SHORTNAME,"Justin SMC ("+IntegerToString(InpSwingLength)+")");
    ObjectsDeleteAll(g_chartId,g_pref);
    
    g_initTime=iTime(_Symbol,PERIOD_CURRENT,0);
