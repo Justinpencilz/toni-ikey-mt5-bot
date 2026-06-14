@@ -125,7 +125,7 @@ struct OrderBlock
 {
    double   barHigh;
    double   barLow;
-   int      barTime;
+   datetime barTime;
    int      bias;
 };
 
@@ -133,10 +133,10 @@ struct TrailingExtremes
 {
    double   top;
    double   bottom;
-   int      barTime;
+   datetime barTime;
    int      barIndex;
-   int      lastTopTime;
-   int      lastBottomTime;
+   datetime lastTopTime;
+   datetime lastBottomTime;
 };
 
 // FVG struct — NO strings! Box names built inline
@@ -145,7 +145,7 @@ struct FVG
    double   top;
    double   bottom;
    int      bias;
-   int      barBTime;
+   datetime barBTime;
 };
 
 //+------------------------------------------------------------------+
@@ -229,7 +229,7 @@ double   g_parsedHighs[];
 double   g_parsedLows[];
 double   g_highs[];
 double   g_lows[];
-int      g_times[];
+datetime g_times[];
 
 // Order blocks — plain arrays, no ArrayCopy
 OrderBlock g_swingOBs[];
@@ -252,7 +252,7 @@ struct Alerts
 Alerts g_alerts;
 
 int      g_lastBarIndex = -1;
-int      g_initTime = 0;
+datetime g_initTime = 0;
 double   g_fvgSumPct = 0;
 int      g_fvgCount = 0;
 
@@ -332,7 +332,7 @@ bool StartOfBullishLeg(int leg) { static int lastLegBu=0; bool chg=(leg!=lastLeg
 //+------------------------------------------------------------------+
 //| DRAW LABEL                                                       |
 //+------------------------------------------------------------------+
-void DrawLabel(int t, double price, string tag, color c, int anchor)
+void DrawLabel(datetime t, double price, string tag, color c, int anchor)
 {
    string n=g_pref+"LBL_"+tag+"_"+IntegerToString(t);
    if(InpMode==MODE_PRESENT) ObjectDelete(g_chartId,n);
@@ -437,11 +437,11 @@ void GetCurrentStructure(int size, bool eqhl, bool internal,
    {
       // Determine which pivot gets updated
       if(eqhl)
-         UpdateLowPivot(g_eqLow, low[size], (int)time[size], size, atr, true, false);
+         UpdateLowPivot(g_eqLow, low[size], time[size], size, atr, true, false);
       else if(internal)
-         UpdateLowPivot(g_intLow, low[size], (int)time[size], size, atr, false, true);
+         UpdateLowPivot(g_intLow, low[size], time[size], size, atr, false, true);
       else
-         UpdateLowPivot(g_swingLow, low[size], (int)time[size], size, atr, false, false);
+         UpdateLowPivot(g_swingLow, low[size], time[size], size, atr, false, false);
       
       if(eqhl && g_eqLow.currentLevel>0 && MathAbs(g_eqLow.currentLevel-low[size])<InpEqThreshold*atr)
       {
@@ -452,11 +452,11 @@ void GetCurrentStructure(int size, bool eqhl, bool internal,
    else // pivotHigh
    {
       if(eqhl)
-         UpdateHighPivot(g_eqHigh, high[size], (int)time[size], size, atr, true, false);
+         UpdateHighPivot(g_eqHigh, high[size], time[size], size, atr, true, false);
       else if(internal)
-         UpdateHighPivot(g_intHigh, high[size], (int)time[size], size, atr, false, true);
+         UpdateHighPivot(g_intHigh, high[size], time[size], size, atr, false, true);
       else
-         UpdateHighPivot(g_swingHigh, high[size], (int)time[size], size, atr, false, false);
+         UpdateHighPivot(g_swingHigh, high[size], time[size], size, atr, false, false);
       
       if(eqhl && g_eqHigh.currentLevel>0 && MathAbs(g_eqHigh.currentLevel-high[size])<InpEqThreshold*atr)
       {
@@ -467,7 +467,7 @@ void GetCurrentStructure(int size, bool eqhl, bool internal,
 }
 
 // Separate helpers to avoid pointer/reference issues
-void UpdateLowPivot(Pivot &p, double price, int t, int idx, double atr, bool eqhl, bool internal)
+void UpdateLowPivot(Pivot &p, double price, datetime t, int idx, double atr, bool eqhl, bool internal)
 {
    p.lastLevel=p.currentLevel;
    p.currentLevel=price;
@@ -490,7 +490,7 @@ void UpdateLowPivot(Pivot &p, double price, int t, int idx, double atr, bool eqh
    }
 }
 
-void UpdateHighPivot(Pivot &p, double price, int t, int idx, double atr, bool eqhl, bool internal)
+void UpdateHighPivot(Pivot &p, double price, datetime t, int idx, double atr, bool eqhl, bool internal)
 {
    p.lastLevel=p.currentLevel;
    p.currentLevel=price;
@@ -552,10 +552,12 @@ void StoreOrderBlock(Pivot &p, bool internal, int bias)
    OrderBlock ob;
    ob.barHigh=ParsedHigh(impulseBar);
    ob.barLow=ParsedLow(impulseBar);
-   ob.barTime=(int)iTime(_Symbol,PERIOD_CURRENT,impulseBar);
+   ob.barTime=iTime(_Symbol,PERIOD_CURRENT,impulseBar);
    ob.bias=bias;
    
-   OrderBlock arr[]; CopyOBArray(arr,internal?g_intOBs:g_swingOBs);
+   OrderBlock arr[];
+   if(internal) CopyOBArray(arr,g_intOBs);
+   else CopyOBArray(arr,g_swingOBs);
    int sz=ArraySize(arr);
    int max=internal?InpIntOBMax:InpSwingOBMax;
    if(sz>=max) ArrayRemoveOB(arr,0);
@@ -567,7 +569,9 @@ void StoreOrderBlock(Pivot &p, bool internal, int bias)
 
 void DeleteOrderBlocks(bool internal)
 {
-   OrderBlock arr[]; CopyOBArray(arr,internal?g_intOBs:g_swingOBs);
+   OrderBlock arr[];
+   if(internal) CopyOBArray(arr,g_intOBs);
+   else CopyOBArray(arr,g_swingOBs);
    int sz=ArraySize(arr);
    if(sz==0) return;
    
@@ -609,7 +613,9 @@ void DeleteOrderBlocks(bool internal)
 
 void DrawOrderBlocks(bool internal)
 {
-   OrderBlock arr[]; CopyOBArray(arr,internal?g_intOBs:g_swingOBs);
+   OrderBlock arr[];
+   if(internal) CopyOBArray(arr,g_intOBs);
+   else CopyOBArray(arr,g_swingOBs);
    int sz=ArraySize(arr);
    int drawN=MathMin(sz,internal?InpIntOBMax:InpSwingOBMax);
    if(drawN<=0) return;
@@ -749,7 +755,7 @@ void DeleteFairValueGaps()
    }
 }
 
-void AddFVG(int tA, int tB, int tC, double top, double bottom, bool bullish)
+void AddFVG(datetime tA, datetime tB, datetime tC, double top, double bottom, bool bullish)
 {
    for(int i=0;i<ArraySize(g_fvgs);i++)
       if(g_fvgs[i].top==top && g_fvgs[i].bottom==bottom) return;
@@ -791,7 +797,7 @@ void DrawFairValueGaps()
       double aH=iHigh(_Symbol,fvgTF,shiftA), aL=iLow(_Symbol,fvgTF,shiftA);
       double bO=iOpen(_Symbol,fvgTF,shiftB), bC=iClose(_Symbol,fvgTF,shiftB);
       double cL=iLow(_Symbol,fvgTF,shiftC), cH=iHigh(_Symbol,fvgTF,shiftC);
-      int tB=(int)iTime(_Symbol,fvgTF,shiftB), tC=(int)iTime(_Symbol,fvgTF,shiftC), tA=(int)iTime(_Symbol,fvgTF,shiftA);
+      datetime tB=iTime(_Symbol,fvgTF,shiftB), tC=iTime(_Symbol,fvgTF,shiftC), tA=iTime(_Symbol,fvgTF,shiftA);
       
       double pct=(bO>0)?(bC-bO)/bO*100.0:0;
       bool newTF=(shiftC==2);
@@ -807,16 +813,16 @@ void DrawFairValueGaps()
 //| MTF LEVELS                                                       |
 //+------------------------------------------------------------------+
 void DrawLevels(ENUM_TIMEFRAMES tf, bool sameTF, ENUM_LINE_STYLE style, color col,
-                string highLabel, string lowLabel, int currentTime)
+                string highLabel, string lowLabel, datetime currentTime)
 {
    double tH=iHigh(_Symbol,tf,1), tL=iLow(_Symbol,tf,1);
    if(tH==0||tL==0) return;
    double pHigh=tH, pLow=tL;
-   int pTH=(int)iTime(_Symbol,tf,1), pTL=(int)iTime(_Symbol,tf,1);
+   datetime pTH=iTime(_Symbol,tf,1), pTL=iTime(_Symbol,tf,1);
    
    if(!sameTF)
    {
-      int pEnd=(int)iTime(_Symbol,tf,0), pStart=(int)iTime(_Symbol,tf,1);
+      datetime pEnd=iTime(_Symbol,tf,0), pStart=iTime(_Symbol,tf,1);
       int lIdx=-1, rIdx=-1;
       for(int i=0;i<ArraySize(g_times);i++)
       {
@@ -837,7 +843,7 @@ void DrawLevels(ENUM_TIMEFRAMES tf, bool sameTF, ENUM_LINE_STYLE style, color co
       }
    }
    
-   int rEnd=currentTime+20*PeriodSeconds(PERIOD_CURRENT);
+   datetime rEnd=currentTime+20*PeriodSeconds(PERIOD_CURRENT);
    
    // High
    string hl=g_pref+"MTF_"+highLabel;
@@ -886,7 +892,7 @@ void DrawLevels(ENUM_TIMEFRAMES tf, bool sameTF, ENUM_LINE_STYLE style, color co
 void UpdateTrailingExtremes()
 {
    double h=iHigh(_Symbol,PERIOD_CURRENT,0), l=iLow(_Symbol,PERIOD_CURRENT,0);
-   int t=(int)iTime(_Symbol,PERIOD_CURRENT,0);
+   datetime t=iTime(_Symbol,PERIOD_CURRENT,0);
    if(h>g_trail.top||g_trail.top==0){g_trail.top=h;g_trail.lastTopTime=t;}
    if(l<g_trail.bottom||g_trail.bottom==0){g_trail.bottom=l;g_trail.lastBottomTime=t;}
 }
@@ -894,7 +900,7 @@ void UpdateTrailingExtremes()
 void DrawHighLowSwings()
 {
    if(g_trail.top==0||g_trail.bottom==0) return;
-   int rEnd=(int)iTime(_Symbol,PERIOD_CURRENT,0)+20*PeriodSeconds(PERIOD_CURRENT);
+   datetime rEnd=iTime(_Symbol,PERIOD_CURRENT,0)+20*PeriodSeconds(PERIOD_CURRENT);
    
    string tl=g_pref+"HLSW_TOP";
    ObjectDelete(g_chartId,tl);
@@ -947,8 +953,8 @@ void DrawPDZones()
    double eMid=(g_trail.top+g_trail.bottom)/2;
    double eTop=0.525*g_trail.top+0.475*g_trail.bottom;
    double eBot=0.525*g_trail.bottom+0.475*g_trail.top;
-   int now=(int)iTime(_Symbol,PERIOD_CURRENT,0);
-   int midIdx=(int)iTime(_Symbol,PERIOD_CURRENT,g_trail.barIndex/2);
+   datetime now=iTime(_Symbol,PERIOD_CURRENT,0);
+   datetime midIdx=iTime(_Symbol,PERIOD_CURRENT,g_trail.barIndex/2);
    
    // Premium
    string bx=g_pref+"PD_Premium";
@@ -1032,7 +1038,7 @@ void OnInit()
    if(g_atrHandle==INVALID_HANDLE) Print("WARN: ATR handle failed");
    IndicatorSetString(INDICATOR_SHORTNAME,"Justin SMC ("+IntegerToString(InpSwingLength)+")");
    ObjectsDeleteAll(g_chartId,g_pref);
-   g_initTime=(int)iTime(_Symbol,PERIOD_CURRENT,0);
+   g_initTime=iTime(_Symbol,PERIOD_CURRENT,0);
 }
 
 void OnDeinit(const int reason)
@@ -1071,7 +1077,7 @@ int OnCalculate(const int rates_total, const int prev_calculated,
    }
    asz=ArraySize(g_highs);
    ArrayResize(g_highs,asz+1);ArrayResize(g_lows,asz+1);ArrayResize(g_parsedHighs,asz+1);ArrayResize(g_parsedLows,asz+1);ArrayResize(g_times,asz+1);
-   g_highs[asz]=high[0];g_lows[asz]=low[0];g_parsedHighs[asz]=ParsedHigh(0);g_parsedLows[asz]=ParsedLow(0);g_times[asz]=(int)time[0];
+   g_highs[asz]=high[0];g_lows[asz]=low[0];g_parsedHighs[asz]=ParsedHigh(0);g_parsedLows[asz]=ParsedLow(0);g_times[asz]=time[0];
    
    ZeroMemory(g_alerts);
    
@@ -1102,9 +1108,9 @@ int OnCalculate(const int rates_total, const int prev_calculated,
    if(InpShowSwingOBs) DrawOrderBlocks(false);
    
    // MTF levels
-   if(InpShowDaily && Period()<PERIOD_D1) DrawLevels(PERIOD_D1,false,InpDailyStyle,InpDailyColor,"PDH","PDL",(int)time[0]);
-   if(InpShowWeekly && Period()<PERIOD_W1) DrawLevels(PERIOD_W1,false,InpWeeklyStyle,InpWeeklyColor,"PWH","PWL",(int)time[0]);
-   if(InpShowMonthly && Period()<PERIOD_MN1) DrawLevels(PERIOD_MN1,false,InpMonthlyStyle,InpMonthlyColor,"PMH","PML",(int)time[0]);
+   if(InpShowDaily && Period()<PERIOD_D1) DrawLevels(PERIOD_D1,false,InpDailyStyle,InpDailyColor,"PDH","PDL",time[0]);
+   if(InpShowWeekly && Period()<PERIOD_W1) DrawLevels(PERIOD_W1,false,InpWeeklyStyle,InpWeeklyColor,"PWH","PWL",time[0]);
+   if(InpShowMonthly && Period()<PERIOD_MN1) DrawLevels(PERIOD_MN1,false,InpMonthlyStyle,InpMonthlyColor,"PMH","PML",time[0]);
    
    return rates_total;
 }
