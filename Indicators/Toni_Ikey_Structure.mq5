@@ -82,17 +82,13 @@ int OnCalculate(const int rates_total,
    DrawAllStructures("");
    
    // Minimal BOS label
-   string bosText = "";
+   string bosText = g_ms.hasBOS ? "BOS" : "";
+   string bosColorStr = "";
+   color bosLblColor = clrWhite;
    if(g_ms.hasBOS)
    {
-      bosText = "BOS " + IntegerToString(g_ms.bosBreaksCount);
-      if(g_ms.bosBreaksCount >= BOS_MIN_MULTIPLE)
-         bosText += " VALID";
-      else
-         bosText += " (single)";
+      bosLblColor = g_ms.bosIsBullish ? clrBlue : clrRed;
    }
-   else
-      bosText = "BOS 0";
    
    string objName = "TI_BOS_LABEL";
    if(ObjectFind(g_chartId, objName) < 0)
@@ -101,8 +97,8 @@ int OnCalculate(const int rates_total,
    ObjectSetInteger(g_chartId, objName, OBJPROP_YDISTANCE, 30);
    ObjectSetInteger(g_chartId, objName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    ObjectSetString(g_chartId, objName, OBJPROP_TEXT, bosText);
-   ObjectSetInteger(g_chartId, objName, OBJPROP_COLOR, clrWhite);
-   ObjectSetInteger(g_chartId, objName, OBJPROP_FONTSIZE, 10);
+   ObjectSetInteger(g_chartId, objName, OBJPROP_COLOR, bosLblColor);
+   ObjectSetInteger(g_chartId, objName, OBJPROP_FONTSIZE, 12);
    ObjectSetString(g_chartId, objName, OBJPROP_FONT, "Consolas");
    
    return rates_total;

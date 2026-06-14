@@ -86,8 +86,10 @@ struct MarketStructure
    
    // BOS (Continuation) - Definition 2
    bool                    hasBOS;          // Break of Structure detected
-   int                     bosBreaksCount;  // Number of zones broken (1=single, 2+=multiple)
+   int                     bosBreaksCount;  // How many levels broken
    bool                    bosIsBullish;    // true = BOS to upside, false = downside
+   datetime                bosTime;         // When BOS occurred
+   double                  bosLevel;        // The broken level (previous swing price)
    
    // Trendlines (Definition 1)
    TrendlineInfo           uptrendLine;     // Connecting higher lows

@@ -504,68 +504,65 @@ bool DetectMSS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
 }
 
 //+------------------------------------------------------------------+
-//| 5. BREAK OF STRUCTURE (BOS) — FULL BODY CANDLE BREAK            |
+//| 5. BREAK OF STRUCTURE (BOS) — SINGLE LEVEL BREAK                |
 //|                                                                   |
-//| Bullish BOS: candle closes ABOVE a swing high (full body break)  |
-//| Bearish BOS: candle closes BELOW a swing low (full body break)   |
+//| Bearish BOS (diagram): price closes BELOW the most recent swing   |
+//|   low → continuation of downtrend.                                |
+//|   Horizontal line at the previous swing low.                      |
 //|                                                                   |
-//| WEEP (not BOS): wick touches/beyond level but body doesn't close |
+//| Bullish BOS: price closes ABOVE the most recent swing high →      |
+//|   continuation of uptrend.                                        |
+//|   Horizontal line at the previous swing high.                     |
 //|                                                                   |
-//| Does NOT check bars — checks each swing point against current    |
-//| close. If close has moved beyond the swing level = BOS.          |
+//| WEEP (not BOS): wick breaks the level but body close doesn't.    |
 //|                                                                   |
-//| Single BOS (1 level broken) → IGNORE                             |
-//| Multiple BOS (2+ levels broken) → VALID                          |
+//| Only ONE level is checked — the most recent swing in the trend.  |
 //+------------------------------------------------------------------+
 
 bool DetectBOS(string symbol, ENUM_TIMEFRAMES tf, int barsBack)
 {
    g_ms.hasBOS = false;
    g_ms.bosBreaksCount = 0;
+   g_ms.bosLevel = 0;
+   g_ms.bosTime = 0;
    
-   // Get current close
    double currentClose = iClose(symbol, tf, 1);
-   double currentHigh  = iHigh(symbol, tf, 1);
-   double currentLow   = iLow(symbol, tf, 1);
    
    int hCount = ArraySize(g_swingHighs);
    int lCount = ArraySize(g_swingLows);
    
-   int bullishBreaks = 0;  // Close above swing high
-   int bearishBreaks = 0;  // Close below swing low
-   
-   // Check each swing high: has close moved above it?
-   for(int i = 0; i < hCount; i++)
+   // ---- Bullish BOS: close ABOVE the most recent swing high ----
+   if(hCount >= 1)
    {
-      double swingPrice = g_swingHighs[i].price;
+      double lastHigh = g_swingHighs[0].price;
+      datetime highTime = g_swingHighs[0].time;
       
-      if(currentClose > swingPrice)
+      if(currentClose > lastHigh)
       {
-         // Full body BOS — close above the swing high
-         bullishBreaks++;
+         g_ms.hasBOS = true;
+         g_ms.bosIsBullish = true;
+         g_ms.bosBreaksCount = 1;
+         g_ms.bosLevel = lastHigh;
+         g_ms.bosTime = highTime;
+         return true;
       }
    }
    
-   // Check each swing low: has close moved below it?
-   for(int i = 0; i < lCount; i++)
+   // ---- Bearish BOS: close BELOW the most recent swing low ----
+   if(lCount >= 1)
    {
-      double swingPrice = g_swingLows[i].price;
+      double lastLow = g_swingLows[0].price;
+      datetime lowTime = g_swingLows[0].time;
       
-      if(currentClose < swingPrice)
+      if(currentClose < lastLow)
       {
-         // Full body BOS — close below the swing low
-         bearishBreaks++;
+         g_ms.hasBOS = true;
+         g_ms.bosIsBullish = false;
+         g_ms.bosBreaksCount = 1;
+         g_ms.bosLevel = lastLow;
+         g_ms.bosTime = lowTime;
+         return true;
       }
-   }
-   
-   // Determine direction
-   g_ms.bosIsBullish = (bullishBreaks >= bearishBreaks);
-   g_ms.bosBreaksCount = MathMax(bullishBreaks, bearishBreaks);
-   
-   if(g_ms.bosBreaksCount >= 1)
-   {
-      g_ms.hasBOS = true;
-      return true;
    }
    
    return false;

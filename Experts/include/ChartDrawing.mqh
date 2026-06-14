@@ -159,98 +159,57 @@ void DrawAllStructures(string biasStr)
 }
 
 //+------------------------------------------------------------------+
-//| BOS — dotted lines at body-broken swing levels only              |
+//| BOS — SINGLE horizontal line at the body-broken swing level     |
+//| Exactly as shown in the diagram: line at previous swing low,     |
+//| "BOS" label in the center. Only one line at a time.              |
 //+------------------------------------------------------------------+
 
 void DrawBOS()
 {
    if(g_ms.hasBOS)
    {
+      double level = g_ms.bosLevel;
+      datetime bosTime = g_ms.bosTime;
       bool isBullish = g_ms.bosIsBullish;
-      int breaks = g_ms.bosBreaksCount;
-      color bosColor = isBullish ? clrDodgerBlue : clrRed;
+      color bosColor = isBullish ? clrBlue : clrRed;
       
-      Print("BOS detected: " + IntegerToString(breaks) + " breaks (" + (isBullish ? "BULLISH" : "BEARISH") + ")");
+      Print("BOS at " + DoubleToString(level, _Digits) + " (" + (isBullish ? "BULLISH" : "BEARISH") + ")");
       
-      if(isBullish && ArraySize(g_swingHighs) > 0)
+      // Single horizontal line at the broken level
+      string objName = gd_prefix + "BOS_LINE";
+      if(ObjectFind(gd_chartId, objName) < 0)
+         ObjectCreate(gd_chartId, objName, OBJ_HLINE, 0, 0, level);
+      ObjectSetDouble(gd_chartId, objName, OBJPROP_PRICE, level);
+      ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, bosColor);
+      ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 2);
+      ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, false);
+      
+      // "BOS" label at the left side of the line
+      string lblName = gd_prefix + "BOS_LABEL";
+      if(ObjectFind(gd_chartId, lblName) < 0)
+         ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, bosTime, level);
+      ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "BOS");
+      ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, bosColor);
+      ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 10);
+      ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
+      ObjectSetInteger(gd_chartId, lblName, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
+      
+      // Clean up any old multi-line objects
+      for(int i = 0; i < 100; i++)
       {
-         int drawCount = MathMin(breaks, ArraySize(g_swingHighs));
-         for(int i = 0; i < drawCount; i++)
-         {
-            string id = "BOS_H_" + IntegerToString(i);
-            string objName = gd_prefix + id;
-            double level = g_swingHighs[i].price;
-            
-            if(ObjectFind(gd_chartId, objName) < 0)
-               ObjectCreate(gd_chartId, objName, OBJ_HLINE, 0, 0, level);
-            ObjectSetDouble(gd_chartId, objName, OBJPROP_PRICE, level);
-            ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, bosColor);
-            ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 2);
-            ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_SOLID);
-            ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, false);
-            
-            // Label on the line
-            string lblId = "BOS_HL_" + IntegerToString(i);
-            string lblName = gd_prefix + lblId;
-            if(ObjectFind(gd_chartId, lblName) < 0)
-               ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, g_swingHighs[i].time, level);
-            ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "BOS");
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, bosColor);
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 9);
-            ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
-         }
-         int maxToKeep = breaks + 2;
-         for(int i = maxToKeep; i < 100; i++)
-         {
-            if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_H_" + IntegerToString(i))) break;
-         }
-         for(int i = maxToKeep; i < 100; i++)
-         {
-            if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_HL_" + IntegerToString(i))) break;
-         }
-      }
-      
-      if(!isBullish && ArraySize(g_swingLows) > 0)
-      {
-         int drawCount = MathMin(breaks, ArraySize(g_swingLows));
-         for(int i = 0; i < drawCount; i++)
-         {
-            string id = "BOS_L_" + IntegerToString(i);
-            string objName = gd_prefix + id;
-            double level = g_swingLows[i].price;
-            
-            if(ObjectFind(gd_chartId, objName) < 0)
-               ObjectCreate(gd_chartId, objName, OBJ_HLINE, 0, 0, level);
-            ObjectSetDouble(gd_chartId, objName, OBJPROP_PRICE, level);
-            ObjectSetInteger(gd_chartId, objName, OBJPROP_COLOR, bosColor);
-            ObjectSetInteger(gd_chartId, objName, OBJPROP_WIDTH, 2);
-            ObjectSetInteger(gd_chartId, objName, OBJPROP_STYLE, STYLE_SOLID);
-            ObjectSetInteger(gd_chartId, objName, OBJPROP_BACK, false);
-            
-            string lblId = "BOS_LL_" + IntegerToString(i);
-            string lblName = gd_prefix + lblId;
-            if(ObjectFind(gd_chartId, lblName) < 0)
-               ObjectCreate(gd_chartId, lblName, OBJ_TEXT, 0, g_swingLows[i].time, level);
-            ObjectSetString(gd_chartId, lblName, OBJPROP_TEXT, "BOS");
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_COLOR, bosColor);
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_FONTSIZE, 9);
-            ObjectSetString(gd_chartId, lblName, OBJPROP_FONT, "Consolas");
-            ObjectSetInteger(gd_chartId, lblName, OBJPROP_ANCHOR, ANCHOR_TOP);
-         }
-         int maxToKeep = breaks + 2;
-         for(int i = maxToKeep; i < 100; i++)
-         {
-            if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_L_" + IntegerToString(i))) break;
-         }
-         for(int i = maxToKeep; i < 100; i++)
-         {
-            if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_LL_" + IntegerToString(i))) break;
-         }
+         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_H_" + IntegerToString(i)))
+         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_L_" + IntegerToString(i)))
+         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_HL_" + IntegerToString(i)))
+         if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_LL_" + IntegerToString(i)))
+            break;
       }
    }
    else
    {
+      ObjectDelete(gd_chartId, gd_prefix + "BOS_LINE");
+      ObjectDelete(gd_chartId, gd_prefix + "BOS_LABEL");
+      
       for(int i = 0; i < 100; i++)
       {
          if(!ObjectDelete(gd_chartId, gd_prefix + "BOS_H_" + IntegerToString(i)))
